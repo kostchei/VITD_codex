@@ -1,0 +1,69 @@
+using System.Text.Json;
+
+namespace VastDark.Domain;
+
+public sealed record RegionalCellState(int Column, int Row, Terrain Terrain, int? DieRoll);
+
+public sealed record LocalCellState(int Q, int R, Terrain Terrain, int? DieRoll);
+
+public sealed record LocalMapState(
+    int ParentColumn,
+    int ParentRow,
+    Terrain ParentTerrain,
+    int DensityRoll,
+    int DiceCount,
+    List<LocalCellState> Cells);
+
+public sealed record CampaignState(List<RegionalCellState> RegionalCells, List<LocalMapState> LocalMaps);
+
+public static class CampaignFile
+{
+    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+
+    public static Campaign LoadOrCreate(string path)
+    {
+        if (File.Exists(path))
+        {
+            try
+            {
+                var state = JsonSerializer.Deserialize<CampaignState>(File.ReadAllText(path), JsonOptions);
+                if (state is not null)
+                {
+                    return new Campaign(state);
+                }
+            }
+            catch (JsonException)
+            {
+                // A malformed save is replaced with a new valid campaign.
+            }
+            catch (InvalidDataException)
+            {
+                // A structurally invalid save is replaced with a new valid campaign.
+            }
+            catch (IOException)
+            {
+                // Use a new in-memory campaign if the existing file cannot be read.
+            }
+        }
+
+        var campaign = new Campaign();
+        Save(campaign, path);
+        return campaign;
+    }
+
+    public static void Save(Campaign campaign, string path)
+    {
+        ArgumentNullException.ThrowIfNull(campaign);
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        var directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        var temporaryPath = path + ".tmp";
+        File.WriteAllText(temporaryPath, JsonSerializer.Serialize(campaign.ToState(), JsonOptions));
+        File.Move(temporaryPath, path, overwrite: true);
+    }
+}

@@ -1,0 +1,22 @@
+.godot/
+.mono/
+bin/
+obj/
+.vs/
+
+# Godot-generated import metadata and local editor state
+*.import
+*.uid.tmp
+
+# IDE and operating-system files
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.DS_Store
+Thumbs.db
+
+# Test and diagnostic output
+TestResults/
+*.log
