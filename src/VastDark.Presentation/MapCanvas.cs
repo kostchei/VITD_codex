@@ -47,6 +47,8 @@ public partial class MapCanvas : Control
 
     public event Action<string>? CellSelected;
 
+    public HexCoord? SelectedLocalCoordinate => _selectedLocal;
+
     public void SetNavigation(MapNavigationService navigation)
     {
         _navigation = navigation;
@@ -129,6 +131,10 @@ public partial class MapCanvas : Control
         {
             var isDungeon = cell == Campaign.DungeonRegionalCoordinate;
             DrawHex(RegionalCentre(cell), RegionalHexRadius, _navigation.Campaign.Regional.GetTerrain(cell), _selectedRegional == cell, isDungeon ? new Color("d97735") : null);
+            if (cell == _navigation.Campaign.PartyTravel.RegionalCoordinate)
+            {
+                DrawPartyMarker(RegionalCentre(cell), RegionalHexRadius);
+            }
         }
     }
 
@@ -154,6 +160,12 @@ public partial class MapCanvas : Control
             {
                 DrawRoamingHazard(LocalCentre(coordinate), dieRoll);
             }
+        }
+
+        var partyTravel = _navigation.Campaign.PartyTravel;
+        if (map.Parent == partyTravel.RegionalCoordinate && map.VisibleCells.Contains(partyTravel.LocalCoordinate))
+        {
+            DrawPartyMarker(LocalCentre(partyTravel.LocalCoordinate), LocalHexRadius);
         }
 
         DrawPolygonBorder(regionalBoundary, RegionalOutline, Math.Max(2f, _zoom * 2f));
@@ -252,6 +264,23 @@ public partial class MapCanvas : Control
             HorizontalAlignment.Left,
             -1f,
             Mathf.RoundToInt(15f * _zoom),
+            Colors.White);
+    }
+
+    private void DrawPartyMarker(Vector2 worldCentre, float hexRadius)
+    {
+        var centre = ToScreen(worldCentre);
+        var radius = Math.Max(8f, hexRadius * 0.22f) * _zoom;
+        var fill = new Color("218c74");
+        DrawCircle(centre, radius, fill);
+        DrawArc(centre, radius, 0f, Mathf.Tau, 24, Colors.White, Math.Max(1.5f, _zoom * 2f), true);
+        DrawString(
+            ThemeDB.FallbackFont,
+            centre + new Vector2(-4.5f * _zoom, 5.5f * _zoom),
+            "P",
+            HorizontalAlignment.Left,
+            -1f,
+            Mathf.RoundToInt(14f * _zoom),
             Colors.White);
     }
 

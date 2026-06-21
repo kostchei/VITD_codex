@@ -24,6 +24,7 @@ public sealed class Campaign
         _random = random ?? Random.Shared;
         Regional = new RegionalMap(_random);
         Dungeon = PrototypeDungeonBuilder.CreateSixLevelDungeon();
+        PartyTravel = new PartyTravelState(new RegionalCoord(0, 0), HexCoord.Zero);
     }
 
     public Campaign(CampaignState state)
@@ -41,14 +42,32 @@ public sealed class Campaign
                 throw new InvalidDataException("The campaign save contains an invalid local map.");
             }
         }
+
+        PartyTravel = state.PartyTravel is { } partyState
+            ? new PartyTravelState(
+                new RegionalCoord(partyState.RegionalColumn, partyState.RegionalRow),
+                new HexCoord(partyState.LocalQ, partyState.LocalR),
+                partyState.Day,
+                partyState.DailyMiles,
+                partyState.Exhaustion,
+                partyState.ForcedMarchUsed,
+                partyState.Rations)
+            : new PartyTravelState(new RegionalCoord(0, 0), HexCoord.Zero);
+
+        if (!Regional.Contains(PartyTravel.RegionalCoordinate) || !GetLocalMap(PartyTravel.RegionalCoordinate).VisibleCells.Contains(PartyTravel.LocalCoordinate))
+        {
+            throw new InvalidDataException("The campaign save contains an invalid party location.");
+        }
     }
 
     public RegionalMap Regional { get; }
     public Dungeon Dungeon { get; }
+    public PartyTravelState PartyTravel { get; }
 
     public CampaignState ToState() => new(
         Regional.ToState().ToList(),
-        _localMaps.Values.Select(map => map.ToState()).ToList());
+        _localMaps.Values.Select(map => map.ToState()).ToList(),
+        PartyTravel.ToState());
 
     public LocalMap GetLocalMap(RegionalCoord coordinate)
     {
@@ -68,6 +87,72 @@ public sealed class Campaign
 
     public bool HasDungeonEntrance(RegionalCoord regionalCoordinate) =>
         regionalCoordinate == DungeonRegionalCoordinate;
+
+    public PartyMoveResult TryMoveParty(RegionalCoord localMapCoordinate, HexCoord target)
+    {
+        if (PartyTravel.RegionalCoordinate != localMapCoordinate)
+        {
+            return MoveFailed("The party is in a different regional hex.");
+        }
+
+        var map = GetLocalMap(localMapCoordinate);
+        if (!map.VisibleCells.Contains(target))
+        {
+            return MoveFailed("The selected local hex cannot be entered.");
+        }
+
+        if (PartyTravel.RestRequired)
+        {
+            return MoveFailed("Rest is required before the party can move again.");
+        }
+
+        if (PartyTravel.LocalCoordinate.DistanceTo(target) != 1)
+        {
+            return MoveFailed("The party can move only to an adjacent local hex.");
+        }
+
+        PartyTravel.MoveTo(target);
+        var message = PartyTravel.RestRequired
+            ? $"Moved 1 mile. {PartyTravel.DailyMiles} / {PartyTravel.DailyMileLimit} miles; rest is required."
+            : $"Moved 1 mile. {PartyTravel.DailyMiles} / {PartyTravel.DailyMileLimit} miles.";
+        return new PartyMoveResult(true, message, PartyTravel.DailyMiles, PartyTravel.DailyMileLimit, PartyTravel.RestRequired);
+    }
+
+    public PartyMoveResult TryBeginForcedMarch()
+    {
+        if (!PartyTravel.CanForcedMarch)
+        {
+            return MoveFailed("Forced march is available after 18 miles and before resting.");
+        }
+
+        PartyTravel.BeginForcedMarch();
+        return new PartyMoveResult(
+            true,
+            $"Forced march started: 1 exhaustion gained. Travel allowance is now {PartyTravel.DailyMileLimit} miles.",
+            PartyTravel.DailyMiles,
+            PartyTravel.DailyMileLimit,
+            PartyTravel.RestRequired);
+    }
+
+    public PartyMoveResult TryRestParty()
+    {
+        var consumedRation = PartyTravel.Rest();
+        return new PartyMoveResult(
+            true,
+            consumedRation
+                ? $"The party rests and consumes 1 ration. Day {PartyTravel.Day} begins with 18 miles available."
+                : $"The party rests without a ration and gains 1 exhaustion. Day {PartyTravel.Day} begins with 18 miles available.",
+            PartyTravel.DailyMiles,
+            PartyTravel.DailyMileLimit,
+            PartyTravel.RestRequired);
+    }
+
+    private PartyMoveResult MoveFailed(string message) => new(
+        false,
+        message,
+        PartyTravel.DailyMiles,
+        PartyTravel.DailyMileLimit,
+        PartyTravel.RestRequired);
 }
 
 public sealed class MapNavigationService

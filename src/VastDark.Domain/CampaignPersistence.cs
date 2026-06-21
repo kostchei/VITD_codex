@@ -18,7 +18,21 @@ public sealed record LocalMapState(
     List<RoamingHazardState>? RoamingHazards = null,
     int RoamingHazardDay = 0);
 
-public sealed record CampaignState(List<RegionalCellState> RegionalCells, List<LocalMapState> LocalMaps);
+public sealed record PartyTravelStateState(
+    int RegionalColumn,
+    int RegionalRow,
+    int LocalQ,
+    int LocalR,
+    int Day,
+    int DailyMiles,
+    int Exhaustion,
+    bool ForcedMarchUsed,
+    int Rations = 0);
+
+public sealed record CampaignState(
+    List<RegionalCellState> RegionalCells,
+    List<LocalMapState> LocalMaps,
+    PartyTravelStateState? PartyTravel = null);
 
 public static class CampaignFile
 {

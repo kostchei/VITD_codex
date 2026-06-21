@@ -9,11 +9,15 @@ public partial class MapScreen : Control
     private readonly string _campaignPath;
     private MapNavigationService _navigation;
     private readonly Label _locationLabel = new();
+    private readonly Label _travelLabel = new();
     private readonly Label _inspector = new();
     private readonly Button _regionalButton = new() { Text = "Regional" };
     private readonly Button _localButton = new() { Text = "Local" };
     private readonly Button _dungeonButton = new() { Text = "Dungeon" };
     private readonly Button _advanceHazardsButton = new() { Text = "Advance hazards" };
+    private readonly Button _movePartyButton = new() { Text = "Move party here" };
+    private readonly Button _forcedMarchButton = new() { Text = "Forced march (+6 miles)" };
+    private readonly Button _restButton = new() { Text = "Rest" };
     private readonly MenuButton _campaignMenu = new() { Text = "Campaign" };
     private readonly ConfirmationDialog _newCampaignConfirmation = new()
     {
@@ -55,6 +59,15 @@ public partial class MapScreen : Control
         _locationLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         _locationLabel.HorizontalAlignment = HorizontalAlignment.Right;
         header.AddChild(_locationLabel);
+
+        var travelRow = new HBoxContainer();
+        travelRow.AddThemeConstantOverride("separation", 8);
+        _travelLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        travelRow.AddChild(_travelLabel);
+        travelRow.AddChild(_movePartyButton);
+        travelRow.AddChild(_forcedMarchButton);
+        travelRow.AddChild(_restButton);
+        root.AddChild(travelRow);
 
         var depthRow = new HBoxContainer();
         depthRow.AddChild(new Label { Text = "Dungeon depth:" });
@@ -101,6 +114,9 @@ public partial class MapScreen : Control
         _localButton.Pressed += ShowLocal;
         _dungeonButton.Pressed += ShowDungeon;
         _advanceHazardsButton.Pressed += AdvanceRoamingHazards;
+        _movePartyButton.Pressed += MovePartyToSelectedHex;
+        _forcedMarchButton.Pressed += BeginForcedMarch;
+        _restButton.Pressed += RestParty;
         _campaignMenu.GetPopup().AddItem("New regional map", NewRegionalMapMenuId);
         _campaignMenu.GetPopup().IdPressed += ShowCampaignMenuAction;
         _newCampaignConfirmation.Confirmed += StartNewRegionalMap;
@@ -161,6 +177,48 @@ public partial class MapScreen : Control
         RefreshUi();
     }
 
+    private void MovePartyToSelectedHex()
+    {
+        if (_navigation.Current is not MapLocation.Local local || _mapCanvas?.SelectedLocalCoordinate is not { } target)
+        {
+            _inspector.Text = "Open the party's local map and select an adjacent local hex first.";
+            return;
+        }
+
+        var result = _navigation.Campaign.TryMoveParty(local.RegionalCoordinate, target);
+        if (result.Moved)
+        {
+            CampaignFile.Save(_navigation.Campaign, _campaignPath);
+        }
+
+        _inspector.Text = result.Message;
+        RefreshUi();
+    }
+
+    private void BeginForcedMarch()
+    {
+        var result = _navigation.Campaign.TryBeginForcedMarch();
+        if (result.Moved)
+        {
+            CampaignFile.Save(_navigation.Campaign, _campaignPath);
+        }
+
+        _inspector.Text = result.Message;
+        RefreshUi();
+    }
+
+    private void RestParty()
+    {
+        var result = _navigation.Campaign.TryRestParty();
+        if (result.Moved)
+        {
+            CampaignFile.Save(_navigation.Campaign, _campaignPath);
+        }
+
+        _inspector.Text = result.Message;
+        RefreshUi();
+    }
+
     private void ShowCampaignMenuAction(long id)
     {
         if (id == NewRegionalMapMenuId)
@@ -185,6 +243,11 @@ public partial class MapScreen : Control
         _dungeonButton.Disabled = current is not MapLocation.Local currentLocal ||
                                   !_navigation.Campaign.HasDungeonEntrance(currentLocal.RegionalCoordinate);
         _advanceHazardsButton.Disabled = current is not MapLocation.Local;
+        var partyTravel = _navigation.Campaign.PartyTravel;
+        var viewingPartyLocalMap = current is MapLocation.Local partyLocal && partyLocal.RegionalCoordinate == partyTravel.RegionalCoordinate;
+        _movePartyButton.Disabled = !viewingPartyLocalMap || _mapCanvas?.SelectedLocalCoordinate is null || partyTravel.RestRequired;
+        _forcedMarchButton.Disabled = !partyTravel.CanForcedMarch;
+        _restButton.Disabled = false;
 
         foreach (var button in _depthButtons)
         {
@@ -198,11 +261,13 @@ public partial class MapScreen : Control
             MapLocation.Dungeon dungeon => $"Dungeon at {dungeon.RegionalCoordinate}, depth {dungeon.Depth}",
             _ => string.Empty,
         };
+        _travelLabel.Text = $"Party: {partyTravel.LocalCoordinate} in {partyTravel.RegionalCoordinate} | Day {partyTravel.Day} | {partyTravel.DailyMiles} / {partyTravel.DailyMileLimit} miles | Rations {partyTravel.Rations} | Exhaustion {partyTravel.Exhaustion}";
         _mapCanvas?.Refresh();
     }
 
     private void SetInspectorText(string text)
     {
         _inspector.Text = text;
+        RefreshUi();
     }
 }

@@ -32,6 +32,79 @@ Assert(local.RoamingHazards.Keys.Distinct().Count() == originalHazardFaces.Lengt
 Assert(local.RoamingHazards.Values.Order().SequenceEqual(originalHazardFaces), "Moving hazards must preserve their face values.");
 Assert(LocalMap.GetRoamingHazardName(4) == "Void Lightning", "Hazard names must match their d6 result.");
 
+var clearWeather = new TravelEventTable([new TravelEventDefinition("Clear skies")]);
+var quietEncounter = new TravelEventTable([new TravelEventDefinition("No encounter")]);
+var unusedDeck = new WastesDeck([
+    new WastesCard("Unused", CreateWastesOutcomes(new WastesEntry("Unused", []))),
+]);
+var travelWorld = new TravelWorld(
+    unusedDeck,
+    new Dictionary<Terrain, TerrainTravelProfile>
+    {
+        [Terrain.Wastes] = new TerrainTravelProfile(clearWeather, quietEncounter),
+    },
+    TravelEventCadence.PerTravelPeriod);
+var alice = new Traveler("Alice", rations: 1);
+var bob = new Traveler("Bob");
+var party = new TravelParty([alice, bob]);
+var travel = new TravelService().TravelDay(
+    party,
+    [new TravelSegment(Terrain.Wastes, 30)],
+    travelWorld,
+    forcedMarchLevels: 1,
+    new SystemRandomSource(new Random(67890)));
+Assert(travel.MilesTravelled == 24, "A party must travel 18 miles plus 6 miles per forced-march exhaustion level.");
+Assert(alice.Rations == 0 && alice.Exhaustion == 1, "A fed traveler must spend one ration and gain forced-march exhaustion.");
+Assert(bob.Exhaustion == 2, "An unfed traveler must gain exhaustion for starvation and forced marching.");
+Assert(travel.Events.Count == 4 && travel.Events.All(@event => @event.Terrain == Terrain.Wastes), "Weather and encounters must resolve from the terrain profile for each travel period.");
+Assert(travel.RestRequired && party.MustStopTraveling, "A travel day must require rest after movement ends.");
+
+var dangerousOutcomes = CreateWastesOutcomes(new WastesEntry("Quiet road", []));
+dangerousOutcomes[18] = new WastesEntry("Raider Ambush", [
+    new EffectsStep([new AddConditionEffect("Shaken")]),
+    new CombatStep("Raiders"),
+]);
+var dangerousCard = new WastesCard("Scorched Road", dangerousOutcomes);
+var wastesWorld = new TravelWorld(
+    new WastesDeck([dangerousCard]),
+    new Dictionary<Terrain, TerrainTravelProfile>());
+var wastesParty = new TravelParty([new Traveler("Scout")]);
+var wastesResult = new WastesService().ResolveWastesEncounter(
+    wastesParty,
+    wastesWorld,
+    new ScriptedRandom(0, 12, 6));
+Assert(wastesResult.RollTotal == 18, "Wastes cards must use 1d12 + 1d6, with a maximum total of 18.");
+Assert(wastesResult.CombatEnemyGroup == "Raiders", "Combat steps must expose the enemy group to the caller.");
+Assert(wastesParty.Members[0].Conditions.Contains("Shaken"), "Wastes effects must be committed after the entry resolves.");
+
+var movementCampaign = new Campaign(new Random(76543));
+var partyRegionalCoordinate = movementCampaign.PartyTravel.RegionalCoordinate;
+var partyMap = movementCampaign.GetLocalMap(partyRegionalCoordinate);
+var firstStep = HexCoord.Zero.Neighbour(0);
+Assert(partyMap.VisibleCells.Contains(firstStep), "The party movement test must use a visible local hex.");
+for (var step = 0; step < PartyTravelState.NormalDailyMiles; step++)
+{
+    var target = step % 2 == 0 ? firstStep : HexCoord.Zero;
+    var move = movementCampaign.TryMoveParty(partyRegionalCoordinate, target);
+    Assert(move.Moved, "The party must be able to move one adjacent local hex per mile.");
+}
+
+Assert(movementCampaign.PartyTravel.DailyMiles == 18 && movementCampaign.PartyTravel.RestRequired, "The party must require rest after 18 local miles.");
+Assert(!movementCampaign.TryMoveParty(partyRegionalCoordinate, firstStep).Moved, "The party cannot move after 18 miles without forced marching or resting.");
+var forcedMarch = movementCampaign.TryBeginForcedMarch();
+Assert(forcedMarch.Moved && movementCampaign.PartyTravel.DailyMileLimit == 24 && movementCampaign.PartyTravel.Exhaustion == 1, "Forced march must add one exhaustion and six more miles of travel.");
+for (var step = 0; step < PartyTravelState.ForcedMarchMiles; step++)
+{
+    var target = step % 2 == 0 ? firstStep : HexCoord.Zero;
+    Assert(movementCampaign.TryMoveParty(partyRegionalCoordinate, target).Moved, "Forced march must permit six additional local moves.");
+}
+
+Assert(movementCampaign.PartyTravel.DailyMiles == 24 && movementCampaign.PartyTravel.RestRequired, "The party must require rest after its forced march allowance is used.");
+movementCampaign.PartyTravel.AddRations(1);
+Assert(movementCampaign.TryRestParty().Moved && movementCampaign.PartyTravel.DailyMiles == 0 && movementCampaign.PartyTravel.Day == 2 && movementCampaign.PartyTravel.Rations == 0, "Rest must consume one ration, begin a new travel day, and reset daily miles.");
+var exhaustionBeforeUnfedRest = movementCampaign.PartyTravel.Exhaustion;
+Assert(movementCampaign.TryRestParty().Moved && movementCampaign.PartyTravel.Exhaustion == exhaustionBeforeUnfedRest + 1, "Rest without a ration must add one exhaustion level.");
+
 var ruinsLocal = new LocalMap(new RegionalCoord(0, 0), Terrain.Ruins, new Random(23456));
 Assert(ruinsLocal.DiceCount is 6 or 12 or 32, "Local density must choose 6, 12, or 32 dice.");
 Assert(ruinsLocal.DiceRolls.Count == ruinsLocal.DiceCount, "Local dice must occupy distinct hexes.");
@@ -75,6 +148,10 @@ try
     Assert(loadedLocal.RoamingHazardDay == generatedLocal.RoamingHazardDay, "Saved roaming hazard day must reload exactly.");
     Assert(loadedLocal.RoamingHazards.OrderBy(hazard => hazard.Key.Q).ThenBy(hazard => hazard.Key.R)
         .SequenceEqual(generatedLocal.RoamingHazards.OrderBy(hazard => hazard.Key.Q).ThenBy(hazard => hazard.Key.R)), "Saved roaming hazards must reload exactly.");
+    Assert(loadedCampaign.PartyTravel.RegionalCoordinate == generatedCampaign.PartyTravel.RegionalCoordinate &&
+           loadedCampaign.PartyTravel.LocalCoordinate == generatedCampaign.PartyTravel.LocalCoordinate &&
+           loadedCampaign.PartyTravel.DailyMiles == generatedCampaign.PartyTravel.DailyMiles,
+        "Saved party travel state must reload exactly.");
 }
 finally
 {
@@ -106,5 +183,29 @@ static void Assert(bool condition, string message)
     if (!condition)
     {
         throw new InvalidOperationException(message);
+    }
+}
+
+static Dictionary<int, WastesEntry> CreateWastesOutcomes(WastesEntry entry) =>
+    Enumerable.Range(2, 17).ToDictionary(total => total, _ => entry);
+
+sealed class ScriptedRandom(params int[] values) : IRandomSource
+{
+    private readonly Queue<int> _values = new(values);
+
+    public int Next(int minInclusive, int maxExclusive)
+    {
+        if (_values.Count == 0)
+        {
+            throw new InvalidOperationException("The test did not provide a scripted random value.");
+        }
+
+        var value = _values.Dequeue();
+        if (value < minInclusive || value >= maxExclusive)
+        {
+            throw new InvalidOperationException($"Scripted random value {value} is outside [{minInclusive}, {maxExclusive}).");
+        }
+
+        return value;
     }
 }
