@@ -6,13 +6,17 @@ public sealed record RegionalCellState(int Column, int Row, Terrain Terrain, int
 
 public sealed record LocalCellState(int Q, int R, Terrain Terrain, int? DieRoll);
 
+public sealed record RoamingHazardState(int Q, int R, int DieRoll);
+
 public sealed record LocalMapState(
     int ParentColumn,
     int ParentRow,
     Terrain ParentTerrain,
     int DensityRoll,
     int DiceCount,
-    List<LocalCellState> Cells);
+    List<LocalCellState> Cells,
+    List<RoamingHazardState>? RoamingHazards = null,
+    int RoamingHazardDay = 0);
 
 public sealed record CampaignState(List<RegionalCellState> RegionalCells, List<LocalMapState> LocalMaps);
 

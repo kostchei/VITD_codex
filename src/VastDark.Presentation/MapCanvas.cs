@@ -143,8 +143,17 @@ public partial class MapCanvas : Control
                 LocalHexRadius,
                 regionalBoundary,
                 map.GetTerrain(cell),
+                map.VisibleCells.Contains(cell),
                 _selectedLocal == cell,
                 isEntrance ? new Color("d97735") : null);
+        }
+
+        foreach (var (coordinate, dieRoll) in map.RoamingHazards)
+        {
+            if (map.VisibleCells.Contains(coordinate))
+            {
+                DrawRoamingHazard(LocalCentre(coordinate), dieRoll);
+            }
         }
 
         DrawPolygonBorder(regionalBoundary, RegionalOutline, Math.Max(2f, _zoom * 2f));
@@ -202,6 +211,7 @@ public partial class MapCanvas : Control
         float radius,
         IReadOnlyList<Vector2> boundary,
         Terrain terrain,
+        bool showTerrainMarker,
         bool selected,
         Color? marker)
     {
@@ -213,16 +223,36 @@ public partial class MapCanvas : Control
 
         DrawColoredPolygon(clippedPoints.Select(ToScreen).ToArray(), TerrainFill(terrain));
         DrawPolygonBorder(clippedPoints, GridLine, Math.Max(1f, _zoom));
-        DrawTerrainMarker(worldCentre, radius, terrain);
+        var visibleCentre = VisiblePolygonCentre(clippedPoints);
+        if (showTerrainMarker)
+        {
+            DrawTerrainMarker(visibleCentre, radius, terrain);
+        }
         if (marker is not null)
         {
-            DrawCircle(ToScreen(worldCentre), 7f * _zoom, marker.Value);
+            DrawCircle(ToScreen(visibleCentre), 7f * _zoom, marker.Value);
         }
 
         if (selected)
         {
             DrawPolygonBorder(clippedPoints, Selection, 3f);
         }
+    }
+
+    private void DrawRoamingHazard(Vector2 worldCentre, int dieRoll)
+    {
+        var centre = ToScreen(worldCentre);
+        var radius = 13f * _zoom;
+        DrawCircle(centre, radius, SymbolLine);
+        DrawArc(centre, radius, 0f, Mathf.Tau, 24, Colors.White, Math.Max(1f, _zoom), true);
+        DrawString(
+            ThemeDB.FallbackFont,
+            centre + new Vector2(-5f * _zoom, 5.5f * _zoom),
+            dieRoll.ToString(),
+            HorizontalAlignment.Left,
+            -1f,
+            Mathf.RoundToInt(15f * _zoom),
+            Colors.White);
     }
 
     private static Vector2[] CreateFlatTopHex(Vector2 centre, float radius)
@@ -270,6 +300,17 @@ public partial class MapCanvas : Control
         }
 
         return output;
+    }
+
+    private static Vector2 VisiblePolygonCentre(IReadOnlyList<Vector2> points)
+    {
+        var total = Vector2.Zero;
+        foreach (var point in points)
+        {
+            total += point;
+        }
+
+        return total / points.Count;
     }
 
     private static bool IsInsideBoundaryEdge(Vector2 point, Vector2 edgeStart, Vector2 edgeEnd) =>
@@ -371,7 +412,10 @@ public partial class MapCanvas : Control
         _selectedLocal = selected;
         var isEntrance = map.Parent == Campaign.DungeonRegionalCoordinate && selected == Campaign.DungeonLocalCoordinate;
         var terrain = map.GetTerrain(selected.Value);
-        CellSelected?.Invoke($"Local subhex {selected.Value}\n\nTerrain: {terrain}\nScale: 1 mile per subhex.\nLocal footprint: 6 subhexes along each regional-hex edge (12 flat-to-flat).{(isEntrance ? "\n\nOrange marker: dungeon entrance." : string.Empty)}");
+        var hazardText = map.RoamingHazards.TryGetValue(selected.Value, out var dieRoll)
+            ? $"\n\nRoaming hazard: {LocalMap.GetRoamingHazardName(dieRoll)} (d6: {dieRoll})."
+            : string.Empty;
+        CellSelected?.Invoke($"Local subhex {selected.Value}\n\nTerrain: {terrain}\nScale: 1 mile per subhex.\nLocal footprint: 6 subhexes along each regional-hex edge (12 flat-to-flat).{hazardText}{(isEntrance ? "\n\nOrange marker: dungeon entrance." : string.Empty)}");
     }
 
     private void SelectDungeon(Vector2 screenPosition, DungeonLevel level)

@@ -138,8 +138,10 @@ public sealed class LocalMap
     public const int FlatToFlatSubhexes = SideLengthInSubhexes;
 
     private readonly HashSet<HexCoord> _cells;
+    private readonly HashSet<HexCoord> _visibleCells;
     private readonly Dictionary<HexCoord, Terrain> _terrain;
     private readonly Dictionary<HexCoord, int> _diceRolls;
+    private readonly Dictionary<HexCoord, int> _roamingHazards;
 
     public LocalMap(RegionalCoord parent, Terrain parentTerrain = Terrain.Wastes, Random? random = null)
     {
@@ -147,33 +149,21 @@ public sealed class LocalMap
         Parent = parent;
         ParentTerrain = parentTerrain;
         _cells = CreateHexagonalCells(SideLengthInSubhexes);
+        _visibleCells = _cells.Where(IsFullyVisibleCell).ToHashSet();
         _terrain = _cells.ToDictionary(cell => cell, _ => parentTerrain == Terrain.Pillars ? Terrain.Pillars : Terrain.Wastes);
         _diceRolls = new Dictionary<HexCoord, int>();
+        _roamingHazards = new Dictionary<HexCoord, int>();
         DensityRoll = RegionalMap.RollD6(random);
-        DiceCount = DensityRoll switch
-        {
-            <= 3 => 6,
-            <= 5 => 12,
-            _ => 32,
-        };
+        DiceCount = GetVisibleDiceCount(DensityRoll, _visibleCells.Count);
 
-        foreach (var coordinate in RegionalMap.ChooseDistinct(_cells, DiceCount, random))
+        foreach (var coordinate in RegionalMap.ChooseDistinct(_visibleCells, DiceCount, random))
         {
             var roll = RegionalMap.RollD6(random);
             _diceRolls.Add(coordinate, roll);
-            _terrain[coordinate] = parentTerrain switch
-            {
-                Terrain.Ruins => roll switch
-                {
-                    1 => Terrain.Wastes,
-                    <= 4 => Terrain.Ruins,
-                    _ => Terrain.Settlements,
-                },
-                Terrain.Wastes => roll == 6 ? Terrain.Ruins : Terrain.Wastes,
-                Terrain.Pillars => Terrain.Pillars,
-                _ => throw new InvalidOperationException("A local map must have a regional terrain parent."),
-            };
+            ApplyTerrainRoll(coordinate, roll);
         }
+
+        CreateRoamingHazards(random);
     }
 
     public LocalMap(LocalMapState state)
@@ -182,16 +172,18 @@ public sealed class LocalMap
         Parent = new RegionalCoord(state.ParentColumn, state.ParentRow);
         ParentTerrain = state.ParentTerrain;
         DensityRoll = state.DensityRoll;
-        DiceCount = state.DiceCount;
         RegionalMap.ValidateDieRoll(DensityRoll);
-        if (DiceCount is not (6 or 12 or 32))
+        if (state.DiceCount is not (6 or 12 or 32))
         {
-            throw new InvalidDataException("A local map must contain 6, 12, or 32 dice.");
+            throw new InvalidDataException("A local map contains an invalid number of terrain dice.");
         }
 
         _cells = CreateHexagonalCells(SideLengthInSubhexes);
+        _visibleCells = _cells.Where(IsFullyVisibleCell).ToHashSet();
         _terrain = new Dictionary<HexCoord, Terrain>();
         _diceRolls = new Dictionary<HexCoord, int>();
+        _roamingHazards = new Dictionary<HexCoord, int>();
+        var savedDiceRolls = new Dictionary<HexCoord, int>();
         foreach (var cellState in state.Cells ?? throw new InvalidDataException("The local map is missing cells."))
         {
             var coordinate = new HexCoord(cellState.Q, cellState.R);
@@ -203,13 +195,77 @@ public sealed class LocalMap
             if (cellState.DieRoll is { } roll)
             {
                 RegionalMap.ValidateDieRoll(roll);
-                _diceRolls.Add(coordinate, roll);
+                savedDiceRolls.Add(coordinate, roll);
             }
         }
 
-        if (_terrain.Count != _cells.Count || _diceRolls.Count != DiceCount)
+        DiceCount = GetVisibleDiceCount(DensityRoll, _visibleCells.Count);
+        if (_terrain.Count != _cells.Count || savedDiceRolls.Count < DiceCount)
         {
             throw new InvalidDataException("The campaign save does not contain a complete local map.");
+        }
+
+        // Older saves could place terrain dice in clipped edge cells. Rebuild
+        // their terrain rolls into fully visible cells before displaying them.
+        foreach (var coordinate in _cells)
+        {
+            _terrain[coordinate] = BaseTerrain;
+        }
+
+        foreach (var (coordinate, roll) in savedDiceRolls.Where(die => _visibleCells.Contains(die.Key)).OrderBy(die => die.Key.Q).ThenBy(die => die.Key.R))
+        {
+            if (_diceRolls.Count == DiceCount)
+            {
+                break;
+            }
+
+            _diceRolls.Add(coordinate, roll);
+            ApplyTerrainRoll(coordinate, roll);
+        }
+
+        foreach (var roll in savedDiceRolls.Where(die => !_visibleCells.Contains(die.Key)).OrderBy(die => die.Key.Q).ThenBy(die => die.Key.R).Select(die => die.Value))
+        {
+            if (_diceRolls.Count == DiceCount)
+            {
+                break;
+            }
+
+            var coordinate = _visibleCells.Where(cell => !_diceRolls.ContainsKey(cell)).OrderBy(cell => cell.Q).ThenBy(cell => cell.R).First();
+            _diceRolls.Add(coordinate, roll);
+            ApplyTerrainRoll(coordinate, roll);
+        }
+
+        RoamingHazardDay = state.RoamingHazardDay;
+        if (RoamingHazardDay < 0)
+        {
+            throw new InvalidDataException("The roaming hazard day cannot be negative.");
+        }
+
+        if (state.RoamingHazards is null)
+        {
+            CreateRoamingHazards(Random.Shared);
+        }
+        else
+        {
+            foreach (var hazardState in state.RoamingHazards)
+            {
+                var coordinate = new HexCoord(hazardState.Q, hazardState.R);
+                if (!_cells.Contains(coordinate))
+                {
+                    throw new InvalidDataException("The campaign save contains an invalid roaming hazard.");
+                }
+
+                RegionalMap.ValidateDieRoll(hazardState.DieRoll);
+                var target = _visibleCells.Contains(coordinate) && !_roamingHazards.ContainsKey(coordinate)
+                    ? coordinate
+                    : ChooseUnoccupiedCell(_roamingHazards.Keys.ToHashSet(), Random.Shared);
+                _roamingHazards.Add(target, hazardState.DieRoll);
+            }
+
+            if (_roamingHazards.Count is < 1 or > 6)
+            {
+                throw new InvalidDataException("A local map must contain between one and six roaming hazards.");
+            }
         }
     }
 
@@ -217,13 +273,61 @@ public sealed class LocalMap
     public Terrain ParentTerrain { get; }
     public int DensityRoll { get; }
     public int DiceCount { get; }
+    public int RoamingHazardDay { get; private set; }
     public IReadOnlyCollection<HexCoord> Cells => _cells;
+    public IReadOnlyCollection<HexCoord> VisibleCells => _visibleCells;
     public IReadOnlyDictionary<HexCoord, Terrain> TerrainByCell => _terrain;
     public IReadOnlyDictionary<HexCoord, int> DiceRolls => _diceRolls;
+    public IReadOnlyDictionary<HexCoord, int> RoamingHazards => _roamingHazards;
 
     public bool Contains(HexCoord coordinate) => _cells.Contains(coordinate);
 
     public Terrain GetTerrain(HexCoord coordinate) => _terrain[coordinate];
+
+    private Terrain BaseTerrain => ParentTerrain == Terrain.Pillars ? Terrain.Pillars : Terrain.Wastes;
+
+    public void AdvanceRoamingHazards(Random? random = null)
+    {
+        random ??= Random.Shared;
+        var occupied = new HashSet<HexCoord>(_roamingHazards.Keys);
+        var movedHazards = new Dictionary<HexCoord, int>();
+
+        foreach (var (origin, dieRoll) in _roamingHazards.OrderBy(hazard => hazard.Key.Q).ThenBy(hazard => hazard.Key.R))
+        {
+            occupied.Remove(origin);
+            var target = origin.Neighbour(random.Next(0, HexCoord.Directions.Count));
+            if (!_visibleCells.Contains(target) || occupied.Contains(target))
+            {
+                target = ChooseUnoccupiedCell(occupied, random);
+            }
+
+            occupied.Add(target);
+            movedHazards.Add(target, dieRoll);
+        }
+
+        _roamingHazards.Clear();
+        foreach (var (coordinate, dieRoll) in movedHazards)
+        {
+            _roamingHazards.Add(coordinate, dieRoll);
+        }
+
+        RoamingHazardDay++;
+    }
+
+    public static string GetRoamingHazardName(int dieRoll)
+    {
+        RegionalMap.ValidateDieRoll(dieRoll);
+        return dieRoll switch
+        {
+            1 => "Warband",
+            2 => "Healing Columns",
+            3 => "Collapse",
+            4 => "Void Lightning",
+            5 => "Singing Sand",
+            6 => "Souls",
+            _ => throw new InvalidOperationException(),
+        };
+    }
 
     public LocalMapState ToState() => new(
         Parent.Column,
@@ -236,7 +340,57 @@ public sealed class LocalMap
             coordinate.R,
             _terrain[coordinate],
             _diceRolls.TryGetValue(coordinate, out var roll) ? roll : null))
-            .ToList());
+            .ToList(),
+        _roamingHazards.Select(hazard => new RoamingHazardState(hazard.Key.Q, hazard.Key.R, hazard.Value)).ToList(),
+        RoamingHazardDay);
+
+    private void CreateRoamingHazards(Random random)
+    {
+        var hazardCount = RegionalMap.RollD6(random);
+        foreach (var coordinate in RegionalMap.ChooseDistinct(_visibleCells, hazardCount, random))
+        {
+            _roamingHazards.Add(coordinate, RegionalMap.RollD6(random));
+        }
+    }
+
+    private HexCoord ChooseUnoccupiedCell(IReadOnlySet<HexCoord> occupied, Random random)
+    {
+        var candidates = _visibleCells.Where(cell => !occupied.Contains(cell)).ToArray();
+        if (candidates.Length == 0)
+        {
+            throw new InvalidOperationException("No local cell is available to re-drop a roaming hazard.");
+        }
+
+        return candidates[random.Next(candidates.Length)];
+    }
+
+    private void ApplyTerrainRoll(HexCoord coordinate, int roll)
+    {
+        _terrain[coordinate] = ParentTerrain switch
+        {
+            Terrain.Ruins => roll switch
+            {
+                1 => Terrain.Wastes,
+                <= 4 => Terrain.Ruins,
+                _ => Terrain.Settlements,
+            },
+            Terrain.Wastes => roll == 6 ? Terrain.Ruins : Terrain.Wastes,
+            Terrain.Pillars => Terrain.Pillars,
+            _ => throw new InvalidOperationException("A local map must have a regional terrain parent."),
+        };
+    }
+
+    private static int GetVisibleDiceCount(int densityRoll, int visibleCellCount)
+    {
+        var requestedDiceCount = densityRoll switch
+        {
+            <= 3 => 6,
+            <= 5 => 12,
+            _ => 32,
+        };
+
+        return Math.Min(requestedDiceCount, visibleCellCount);
+    }
 
     private static HashSet<HexCoord> CreateHexagonalCells(int sideLength)
     {
@@ -258,5 +412,26 @@ public sealed class LocalMap
         }
 
         return cells;
+    }
+
+    private static bool IsFullyVisibleCell(HexCoord coordinate)
+    {
+        const double subhexRadius = 1d;
+        var centreX = coordinate.Q * 1.5d * subhexRadius;
+        var centreY = (coordinate.R + coordinate.Q * 0.5d) * Math.Sqrt(3d) * subhexRadius;
+        var mapRadius = SideLengthInSubhexes * subhexRadius;
+
+        for (var vertex = 0; vertex < 6; vertex++)
+        {
+            var angle = vertex * Math.PI / 3d;
+            var x = centreX + Math.Cos(angle) * subhexRadius;
+            var y = centreY + Math.Sin(angle) * subhexRadius;
+            if (Math.Abs(x) + Math.Abs(y) / Math.Sqrt(3d) > mapRadius + 0.0001d)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

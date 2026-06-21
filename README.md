@@ -15,6 +15,9 @@ between game sessions.
   - A d6 determines local density: `1-3` = 6 dice, `4-5` = 12 dice, `6` = 32 dice.
   - Ruins and Wastes use their own local terrain tables; Pillars remain entirely
     Pillar structures.
+  - Each local map also receives 1d6 roaming hazards. Their d6 face determines
+    the hazard, and the `Advance hazards` control moves each marker one hex per
+    local day; a collision or map-edge exit re-drops the marker on an open hex.
 
 The full rules and pseudocode are in [vast-generation.md](vast-generation.md).
 
