@@ -104,6 +104,7 @@ movementCampaign.Party.Members[0].AddRations(1);
 Assert(movementCampaign.TryRestParty().Moved && movementCampaign.PartyTravel.DailyMiles == 0 && movementCampaign.PartyTravel.Day == 2 && movementCampaign.Party.TotalRations == 0, "Rest must consume one ration, begin a new travel day, and reset daily miles.");
 var exhaustionBeforeUnfedRest = movementCampaign.Party.TotalExhaustion;
 Assert(movementCampaign.TryRestParty().Moved && movementCampaign.Party.TotalExhaustion == exhaustionBeforeUnfedRest + 1, "Rest without a ration must add one exhaustion level.");
+Assert(movementCampaign.TravelLog.Count >= 3 && movementCampaign.TravelLog.Last().Message.Contains("Day 3 begins", StringComparison.Ordinal), "Successful travel actions must append a persisted travel log entry.");
 
 var boundaryCampaign = new Campaign(new Random(97531));
 var boundaryOrigin = boundaryCampaign.PartyTravel.RegionalCoordinate;
@@ -176,6 +177,7 @@ try
     var loadedTraveler = loadedCampaign.Party.Members[0];
     Assert(loadedTraveler.Rations == 2 && loadedTraveler.GetSkill("Survival") == 3 && loadedTraveler.GetResource("Water") == 4 && loadedTraveler.Conditions.Contains("Irradiated"),
         "Saved party supplies, skills, resources, and conditions must reload exactly.");
+    Assert(loadedCampaign.TravelLog.SequenceEqual(generatedCampaign.TravelLog), "Saved travel log entries must reload exactly.");
 }
 finally
 {

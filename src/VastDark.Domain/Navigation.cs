@@ -18,6 +18,7 @@ public sealed class Campaign
 
     private readonly Dictionary<RegionalCoord, LocalMap> _localMaps = new();
     private readonly Random _random;
+    private readonly List<TravelLogEntryState> _travelLog;
 
     public Campaign(Random? random = null)
     {
@@ -26,6 +27,7 @@ public sealed class Campaign
         Dungeon = PrototypeDungeonBuilder.CreateSixLevelDungeon();
         Party = new TravelParty([new Traveler("Expedition")]);
         PartyTravel = new PartyTravelState(new RegionalCoord(0, 0), HexCoord.Zero);
+        _travelLog = [];
     }
 
     public Campaign(CampaignState state)
@@ -68,18 +70,25 @@ public sealed class Campaign
         {
             throw new InvalidDataException("The campaign save contains an invalid party location.");
         }
+
+        _travelLog = (state.TravelLog ?? [])
+            .Where(entry => entry.Day >= 1 && !string.IsNullOrWhiteSpace(entry.Message))
+            .TakeLast(100)
+            .ToList();
     }
 
     public RegionalMap Regional { get; }
     public Dungeon Dungeon { get; }
     public TravelParty Party { get; }
     public PartyTravelState PartyTravel { get; }
+    public IReadOnlyList<TravelLogEntryState> TravelLog => _travelLog;
 
     public CampaignState ToState() => new(
         Regional.ToState().ToList(),
         _localMaps.Values.Select(map => map.ToState()).ToList(),
         PartyTravel.ToState(),
-        Party.ToState());
+        Party.ToState(),
+        _travelLog.ToList());
 
     public LocalMap GetLocalMap(RegionalCoord coordinate)
     {
@@ -167,7 +176,7 @@ public sealed class Campaign
             : crossedRegionalBoundary
                 ? $"Crossed into regional hex {localMapCoordinate}. Moved 1 mile; {PartyTravel.DailyMiles} / {PartyTravel.DailyMileLimit} miles."
                 : $"Moved 1 mile. {PartyTravel.DailyMiles} / {PartyTravel.DailyMileLimit} miles.";
-        return new PartyMoveResult(true, message, PartyTravel.DailyMiles, PartyTravel.DailyMileLimit, PartyTravel.RestRequired);
+        return MoveSucceeded(message);
     }
 
     public PartyMoveResult TryBeginForcedMarch()
@@ -178,12 +187,7 @@ public sealed class Campaign
         }
 
         PartyTravel.BeginForcedMarch(Party);
-        return new PartyMoveResult(
-            true,
-            $"Forced march started: each party member gains 1 exhaustion. Travel allowance is now {PartyTravel.DailyMileLimit} miles.",
-            PartyTravel.DailyMiles,
-            PartyTravel.DailyMileLimit,
-            PartyTravel.RestRequired);
+        return MoveSucceeded($"Forced march started: each party member gains 1 exhaustion. Travel allowance is now {PartyTravel.DailyMileLimit} miles.");
     }
 
     public PartyMoveResult TryRestParty()
@@ -192,12 +196,7 @@ public sealed class Campaign
         var rationMessage = restResult.UnfedTravelers == 0
             ? $"The party rests and consumes {restResult.FedTravelers} ration(s)."
             : $"The party rests: {restResult.FedTravelers} ration(s) consumed; {restResult.UnfedTravelers} member(s) gain 1 exhaustion from hunger.";
-        return new PartyMoveResult(
-            true,
-            $"{rationMessage} Day {PartyTravel.Day} begins with 18 miles available.",
-            PartyTravel.DailyMiles,
-            PartyTravel.DailyMileLimit,
-            PartyTravel.RestRequired);
+        return MoveSucceeded($"{rationMessage} Day {PartyTravel.Day} begins with 18 miles available.");
     }
 
     private PartyMoveResult MoveFailed(string message) => new(
@@ -206,6 +205,17 @@ public sealed class Campaign
         PartyTravel.DailyMiles,
         PartyTravel.DailyMileLimit,
         PartyTravel.RestRequired);
+
+    private PartyMoveResult MoveSucceeded(string message)
+    {
+        _travelLog.Add(new TravelLogEntryState(PartyTravel.Day, message));
+        if (_travelLog.Count > 100)
+        {
+            _travelLog.RemoveRange(0, _travelLog.Count - 100);
+        }
+
+        return new PartyMoveResult(true, message, PartyTravel.DailyMiles, PartyTravel.DailyMileLimit, PartyTravel.RestRequired);
+    }
 
     private HexCoord FindBoundaryEntry(RegionalCoord originRegion, HexCoord originLocal, int direction, RegionalCoord destinationRegion)
     {

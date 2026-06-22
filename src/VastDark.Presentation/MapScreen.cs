@@ -11,6 +11,7 @@ public partial class MapScreen : Control
     private readonly Label _locationLabel = new();
     private readonly Label _travelLabel = new();
     private readonly Label _inspector = new();
+    private readonly Label _travelLog = new();
     private readonly Button _regionalButton = new() { Text = "Regional" };
     private readonly Button _localButton = new() { Text = "Local" };
     private readonly Button _dungeonButton = new() { Text = "Dungeon" };
@@ -99,9 +100,15 @@ public partial class MapScreen : Control
         _mapCanvas.CellSelected += SetInspectorText;
         content.AddChild(_mapCanvas);
 
-        var inspectorPanel = new PanelContainer
+        var sidebar = new VBoxContainer
         {
             CustomMinimumSize = new Vector2(260, 0),
+            SizeFlagsVertical = SizeFlags.ExpandFill,
+        };
+        content.AddChild(sidebar);
+
+        var inspectorPanel = new PanelContainer
+        {
             SizeFlagsVertical = SizeFlags.ExpandFill,
         };
         _inspector.Text = "Select a cell to inspect it.";
@@ -110,7 +117,14 @@ public partial class MapScreen : Control
         _inspector.AddThemeConstantOverride("margin_right", 12);
         _inspector.AddThemeConstantOverride("margin_top", 12);
         inspectorPanel.AddChild(_inspector);
-        content.AddChild(inspectorPanel);
+        sidebar.AddChild(inspectorPanel);
+
+        var logTitle = new Label { Text = "Recent travel" };
+        logTitle.AddThemeFontSizeOverride("font_size", 16);
+        sidebar.AddChild(logTitle);
+        _travelLog.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        _travelLog.CustomMinimumSize = new Vector2(0, 150);
+        sidebar.AddChild(_travelLog);
 
         _regionalButton.Pressed += ShowRegional;
         _localButton.Pressed += ShowLocal;
@@ -278,6 +292,9 @@ public partial class MapScreen : Control
         };
         var party = _navigation.Campaign.Party;
         _travelLabel.Text = $"Party: {partyTravel.LocalCoordinate} in {partyTravel.RegionalCoordinate} | Day {partyTravel.Day} | {partyTravel.DailyMiles} / {partyTravel.DailyMileLimit} miles | Rations {party.TotalRations} | Exhaustion {party.TotalExhaustion}";
+        _travelLog.Text = _navigation.Campaign.TravelLog.Count == 0
+            ? "No travel recorded yet."
+            : string.Join("\n", _navigation.Campaign.TravelLog.TakeLast(6).Select(entry => $"Day {entry.Day}: {entry.Message}"));
         _mapCanvas?.Refresh();
     }
 

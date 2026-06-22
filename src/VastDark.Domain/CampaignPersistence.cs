@@ -21,6 +21,8 @@ public sealed record TravelerState(
 
 public sealed record PartyState(List<TravelerState> Members);
 
+public sealed record TravelLogEntryState(int Day, string Message);
+
 public sealed record LocalMapState(
     int ParentColumn,
     int ParentRow,
@@ -46,7 +48,8 @@ public sealed record CampaignState(
     List<RegionalCellState> RegionalCells,
     List<LocalMapState> LocalMaps,
     PartyTravelStateState? PartyTravel = null,
-    PartyState? Party = null);
+    PartyState? Party = null,
+    List<TravelLogEntryState>? TravelLog = null);
 
 public static class CampaignFile
 {
