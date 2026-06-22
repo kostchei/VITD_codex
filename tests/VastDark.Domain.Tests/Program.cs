@@ -130,6 +130,13 @@ Assert(PillarMiningService.RefineAtSettlement(miningInventory, 2, new ScriptedRa
 AssertThrows(() => PillarMiningService.WorkHour(PillarWork.Mining, hasMiningTools: false, new TravelerInventory(1), new ScriptedRandom()), "Pillar mining without tools must be rejected.");
 Assert(Enumerable.Range(1, 14).Select(PillarEncounterRules.Get).All(rule => !string.IsNullOrWhiteSpace(rule.Name)) && PillarEncounterRules.Get(15).Name == "Griffon" && PillarEncounterRules.Get(99).Name == "Griffon", "Pillar encounter results must resolve every documented total and cap 15+ as Griffon.");
 Assert(PillarEncounterRules.GetMood("Lodestone Miners", 1).Name == "Territorial" && PillarEncounterRules.GetMood("Lodestone Miners", 5).Name == "Friendly" && PillarEncounterRules.GetMood("Bandits", 3).Name == "Tribute" && PillarEncounterRules.GetMood("Cutthroats", 6).Name == "Recruit", "Pillar encounter mood bands must match the source.");
+Assert(Enumerable.Range(1, 6).Select(PillarDelvingRules.GetShape).Select(shape => shape.Name).Distinct().Count() == 6, "Every Pillar tunnel d6 shape must resolve uniquely.");
+var delve = new PillarDelve();
+var firstTunnel = delve.EnterTunnel(new ScriptedRandom(2));
+var splitTunnel = delve.EnterTunnel(new ScriptedRandom(2, 5));
+Assert(firstTunnel.Depth == 1 && splitTunnel.Depth == 2 && splitTunnel.SplitMarker == 5 && PillarDelve.MinutesToTravelTunnel == 10 && PillarDelve.MinutesToSearchTunnel == 30, "Pillar delving must track depth, duplicate-shape splits, and documented careful travel/search time.");
+Assert(delve.RollEvent(new ScriptedRandom(3)).Name == "Wind Blast" && delve.RollLoot(new ScriptedRandom(5)).Name == "Lodestone Idols", "Pillar events must escalate by prior rolls and loot by tunnel depth.");
+Assert(PillarDelvingRules.GetEvent(15).Name == "Call of the Dark" && PillarDelvingRules.GetEvent(99).Name == "Call of the Dark" && PillarDelvingRules.GetLoot(14).Name == "Hoard" && PillarDelvingRules.GetLoot(99).Name == "Hoard", "Pillar event and loot tables must cap at their 15+ and 14+ outcomes.");
 var collisionState = local.ToState() with
 {
     RoamingHazards = [
