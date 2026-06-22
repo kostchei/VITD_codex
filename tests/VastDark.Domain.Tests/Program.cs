@@ -11,6 +11,11 @@ foreach (var (coordinate, roll) in regional.DiceRolls)
     var expected = roll switch { 1 => Terrain.Wastes, <= 4 => Terrain.Ruins, _ => Terrain.Pillars };
     Assert(regional.GetTerrain(coordinate) == expected, "Regional die result must select the documented terrain.");
 }
+Assert(Enumerable.Range(1, 6).Select(RegionalMap.GetTerrainForRoll).SequenceEqual([Terrain.Wastes, Terrain.Ruins, Terrain.Ruins, Terrain.Ruins, Terrain.Pillars, Terrain.Pillars]), "Regional d6 terrain table must match page 10 for every roll.");
+Assert(Enumerable.Range(1, 6).Select(LocalMap.GetRequestedDiceCountForDensityRoll).SequenceEqual([6, 6, 6, 12, 12, 32]), "Local density d6 table must match page 10 for every roll.");
+Assert(Enumerable.Range(1, 6).Select(roll => LocalMap.GetTerrainForRoll(Terrain.Ruins, roll)).SequenceEqual([Terrain.Wastes, Terrain.Ruins, Terrain.Ruins, Terrain.Ruins, Terrain.Settlements, Terrain.Settlements]), "Ruins local d6 terrain table must match page 10 for every roll.");
+Assert(Enumerable.Range(1, 6).Select(roll => LocalMap.GetTerrainForRoll(Terrain.Wastes, roll)).SequenceEqual([Terrain.Wastes, Terrain.Wastes, Terrain.Wastes, Terrain.Wastes, Terrain.Wastes, Terrain.Ruins]), "Wastes local d6 terrain table must match page 10 for every roll.");
+Assert(Enumerable.Range(1, 6).Select(roll => LocalMap.GetTerrainForRoll(Terrain.Pillars, roll)).All(terrain => terrain == Terrain.Pillars), "Pillars local maps must remain Pillars for every density die result.");
 
 var local = new LocalMap(new RegionalCoord(0, 0));
 Assert(local.Cells.Count == 91, "The local tessellation must cover every clipped edge subhex.");

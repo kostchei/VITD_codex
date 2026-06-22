@@ -43,12 +43,7 @@ public sealed class RegionalMap
         {
             var roll = RollD6(random);
             _diceRolls.Add(coordinate, roll);
-            _terrain[coordinate] = roll switch
-            {
-                1 => Terrain.Wastes,
-                <= 4 => Terrain.Ruins,
-                _ => Terrain.Pillars,
-            };
+            _terrain[coordinate] = GetTerrainForRoll(roll);
         }
     }
 
@@ -108,6 +103,17 @@ public sealed class RegionalMap
     }
 
     public Terrain GetTerrain(RegionalCoord coordinate) => _terrain[coordinate];
+
+    public static Terrain GetTerrainForRoll(int roll)
+    {
+        ValidateDieRoll(roll);
+        return roll switch
+        {
+            1 => Terrain.Wastes,
+            <= 4 => Terrain.Ruins,
+            _ => Terrain.Pillars,
+        };
+    }
 
     public RegionalCellState[] ToState() => _cells
         .Select(coordinate => new RegionalCellState(
@@ -389,7 +395,13 @@ public sealed class LocalMap
 
     private void ApplyTerrainRoll(HexCoord coordinate, int roll)
     {
-        _terrain[coordinate] = ParentTerrain switch
+        _terrain[coordinate] = GetTerrainForRoll(ParentTerrain, roll);
+    }
+
+    public static Terrain GetTerrainForRoll(Terrain parentTerrain, int roll)
+    {
+        RegionalMap.ValidateDieRoll(roll);
+        return parentTerrain switch
         {
             Terrain.Ruins => roll switch
             {
@@ -403,14 +415,20 @@ public sealed class LocalMap
         };
     }
 
-    private static int GetVisibleDiceCount(int densityRoll, int visibleCellCount)
+    public static int GetRequestedDiceCountForDensityRoll(int densityRoll)
     {
-        var requestedDiceCount = densityRoll switch
+        RegionalMap.ValidateDieRoll(densityRoll);
+        return densityRoll switch
         {
             <= 3 => 6,
             <= 5 => 12,
             _ => 32,
         };
+    }
+
+    private static int GetVisibleDiceCount(int densityRoll, int visibleCellCount)
+    {
+        var requestedDiceCount = GetRequestedDiceCountForDensityRoll(densityRoll);
 
         return Math.Min(requestedDiceCount, visibleCellCount);
     }

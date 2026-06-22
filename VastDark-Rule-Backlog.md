@@ -46,7 +46,7 @@ Content tables are data tasks: every table row must become data and must be vali
 - [ ] **R-07 - Daily travel** (p. 9). Reconcile local-mile movement, 18-mile daily base, 6-mile forced-march increments, and one ration per Traveler per day. Pseudocode: `moveLocalHex(); onRest consumeRationEachTraveler(); applyForcedMarchExhaustion()`. Test normal, forced, hungry, and early-rest stints.
 - [x] **R-08 - Navigation roll and assets** (p. 9). Implemented as `DailyNavigationService`: a d6 failure band reduced by five distinct assets, with Late/Off Course/Dangerously Off Course/Utterly Lost results. Tests cover base rolls, source example, full asset coverage, and duplicate assets.
 - [ ] **R-09 - Terrain event cadence** (pp. 9, 12, 14, 20). Define the explicit campaign event cadence and bind it to movement/day transitions. Pseudocode: `if eventCheckpoint then resolveTerrainEvent(currentTerrain)`. Test terrain selection, cadence carry-over, and interrupted travel.
-- [ ] **R-10 - Regional/local map generation** (p. 10). Validate existing d6 terrain and local-density generation against the source tables. Pseudocode: `regionalDie -> terrain; densityDie -> count; localDie -> localTerrain`. Test every source-table range and generated-map invariant.
+- [x] **R-10 - Regional/local map generation** (p. 10). Existing generation now exposes and tests every regional terrain, local density, and local terrain d6 branch against the source tables.
 
 ## Hazards, Wastes, and Pillars
 
