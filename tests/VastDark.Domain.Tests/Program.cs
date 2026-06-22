@@ -90,6 +90,17 @@ Assert(RoamingHazardRules.Get(3).EncounterDiceSides == 20, "Crawlherd must spawn
 Assert(RoamingHazardRules.Get(4).TerrainDestructionChanceInSix == 2, "Collapse must have a 2-in-6 terrain destruction chance.");
 Assert(RoamingHazardRules.Get(5).DamageDice == "10d6" && RoamingHazardRules.Get(5).TerrainDestructionChanceInSix == 3, "Void Lightning must use a 3-in-6 metal strike for 10d6 damage.");
 Assert(RoamingHazardRules.Get(6).SaveType == "Breath", "Singing Sand must require a Breath save.");
+var hazardParty = new TravelParty([new Traveler("Hazard A"), new Traveler("Hazard B")]);
+var warband = RoamingHazardService.Resolve(1, hazardParty, new RoamingHazardContext(Terrain.Wastes), new ScriptedRandom(6, 6, 6, 6, 6));
+Assert(warband.CombatantCount == 30, "Warbands must spawn 5d6 Cutthroats.");
+var maelstrom = RoamingHazardService.Resolve(2, hazardParty, new RoamingHazardContext(Terrain.Wastes), new ScriptedRandom(0, 20, 20, 20, 5, 20, 20, 20));
+Assert(maelstrom.Displacements.Count == 2 && maelstrom.Damage.All(hit => hit.Amount == 60), "An exposed Maelstrom must displace each Traveler and deal 3d20 damage.");
+Assert(RoamingHazardService.Resolve(2, hazardParty, new RoamingHazardContext(Terrain.Ruins), new ScriptedRandom()).Damage.Count == 0, "Ruins must avoid Maelstrom effects.");
+var collapse = RoamingHazardService.Resolve(4, hazardParty, new RoamingHazardContext(Terrain.Ruins), new ScriptedRandom(2));
+Assert(collapse.ExhaustedTravelers.Count == 2 && collapse.TerrainReducedToWastes, "Running from a Collapse must add exhaustion and Ruins must become Wastes on 2-in-6.");
+var lightning = RoamingHazardService.Resolve(5, hazardParty, new RoamingHazardContext(Terrain.Wastes, HasExposedMetal: true), new ScriptedRandom(3, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 4));
+Assert(lightning.Damage.Count == 1 && lightning.Damage[0].Amount == 60, "Exposed metal must face a 3-in-6 Void Lightning strike for 10d6 damage.");
+Assert(RoamingHazardService.Resolve(6, hazardParty, new RoamingHazardContext(Terrain.Wastes), new ScriptedRandom()).BreathSaveTravelers.Count == 2 && RoamingHazardService.Resolve(6, hazardParty, new RoamingHazardContext(Terrain.Wastes, OnSolidOrRockyGround: true), new ScriptedRandom()).BreathSaveTravelers.Count == 0, "Singing Sand must require Breath saves only on non-solid ground.");
 var collisionState = local.ToState() with
 {
     RoamingHazards = [
