@@ -66,6 +66,8 @@ public sealed record AbilityScores
 
     public int Modifier(Ability ability) => AbilityScoreRules.Modifier(this[ability]);
 
+    public int Get(Ability ability) => this[ability];
+
     public int HighestModifier => Enum.GetValues<Ability>().Max(Modifier);
 
     public static AbilityScores RollDcc(IRandomSource random) => new(

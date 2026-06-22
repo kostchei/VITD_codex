@@ -215,6 +215,10 @@ Assert(rites.GainFromMotion("Pillar-1") && !rites.GainFromMotion("Pillar-1"), "M
 rites.GainFromShunningLight(true); rites.GainFromEmbracingDark(true); rites.GainFromErosionOfSelf();
 Assert(rites.Rites == 4 && rites.LockedErosionExhaustion == 1, "All page 38 Rite gain methods must add one Rite and Erosion must lock its exhaustion.");
 Assert(rites.TrySpendToCast() && rites.Rites == 3 && rites.LockedErosionExhaustion == 0, "Casting must cost one Rite and release one Erosion exhaustion lock when spent.");
+Assert(Enum.GetValues<RiteSpell>().Select(RiteSpellRules.Get).Count() == 15 && RiteSpellRules.Get(RiteSpell.Cinderhowl).CostsRite == false && RiteSpellRules.Get(RiteSpell.Mazewalk).CostsRite, "Every page 38-39 rite must retain its school and Rite-versus-body cost.");
+Assert(RiteSpellRules.FickleDescentLevels(3, 2, coinFace: true) == 2 && RiteSpellRules.FickleDescentLevels(3, 2, coinFace: false) == -2 && RiteSpellRules.SunderDurationSeconds(3) == 18, "Fickle Descent and Sunder to Dust must use their source level scaling.");
+Assert(RiteSpellRules.SparkGritCost(true, new ScriptedRandom(6)) == 1 && RiteSpellRules.SparkGritCost(false, new ScriptedRandom(6)) == 6 && RiteSpellRules.CinderhowlAlertsEncounter(new ScriptedRandom(1)) && !RiteSpellRules.CinderhowlAlertsEncounter(new ScriptedRandom(2)), "Sparks must use the specified body costs and Cinderhowl encounter chance.");
+Assert(RiteSpellRules.LikeClay(new AbilityScores(3,4,5,6,7,8), Ability.Strength, Ability.Charisma) == new AbilityScores(8,4,5,6,7,3), "Like Clay must swap exactly two ability scores.");
 var collisionState = local.ToState() with
 {
     RoamingHazards = [
