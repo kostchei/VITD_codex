@@ -210,6 +210,11 @@ var escapeRitual = new EscapeTheVastRitual();
 AssertThrows(() => escapeRitual.FallForward(), "Leaving the Vast must reject an incomplete ritual.");
 escapeRitual.SeekLushMendedFamiliar(); escapeRitual.SearchCannyClearBenign(); escapeRitual.HideSpotOutsideSenses(); escapeRitual.SpeakWishToLeaveTheVast();
 Assert(escapeRitual.FallForward() == VastTerminalOutcome.EscapedHome, "The complete page 37 ritual must return the Traveler home.");
+var rites = new RiteLedger();
+Assert(rites.GainFromMotion("Pillar-1") && !rites.GainFromMotion("Pillar-1"), "Motions of the Labyrinth must grant a Rite only on first Pillar entry or Ruin descent.");
+rites.GainFromShunningLight(true); rites.GainFromEmbracingDark(true); rites.GainFromErosionOfSelf();
+Assert(rites.Rites == 4 && rites.LockedErosionExhaustion == 1, "All page 38 Rite gain methods must add one Rite and Erosion must lock its exhaustion.");
+Assert(rites.TrySpendToCast() && rites.Rites == 3 && rites.LockedErosionExhaustion == 0, "Casting must cost one Rite and release one Erosion exhaustion lock when spent.");
 var collisionState = local.ToState() with
 {
     RoamingHazards = [

@@ -84,7 +84,7 @@ Content tables are data tasks: every table row must become data and must be vali
 
 ## Rites and creatures
 
-- [ ] **R-35 - Rite acquisition and casting** (p. 38). Encode Rite gain costs, casting procedure, coin flip/outcome, and erosion costs. Pseudocode: `gainRite(cost); castRite -> resolveCoinFlipAndEffect`. Test every gain route and casting branch.
+- [x] **R-35 - Rite acquisition and casting** (p. 38). Implemented unbounded Rite currency, all four source gain routes, first-entry/first-descent gating, sacrifice validation, Erosion of Self's unhealable lock, and one-Rite casting spend. Coin flips are rite-specific (Fickle Descent), not a general casting procedure. Pseudocode: `gainRite(method, cost); spendRiteToCast()`. Tests cover every gain route and Erosion release.
 - [ ] **R-36 - Rites of Sparks** (p. 39). Encode each listed rite, prerequisites, durations, damage, and failure/cost rules. Pseudocode: `castRite(riteId, target) -> applyEffect`. Test each rite's deterministic branches.
 - [ ] **R-37 - Rite daily resets and interaction constraints** (pp. 38-39). Centralize once-per-day, rest, damage, and concentration-like constraints. Pseudocode: `onDayStart -> resetUses; onDamage -> interruptIfRequired`. Test reset and interruption semantics.
 - [ ] **R-38 - Crawl creature stat blocks and special abilities** (pp. 40-41). Encode creature data and combat hooks. Pseudocode: `spawnCreature(id) -> combatant; onSpecialTrigger -> resolveAbility`. Test stat integrity and every special ability's save/damage branch.
