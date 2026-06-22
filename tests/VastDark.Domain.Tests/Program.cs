@@ -156,6 +156,10 @@ Assert(factionUses.ProduceSeekerKeeperItem("rope").Contains("Poor rope") && Thro
 factionUses.ResetDay();
 Assert(factionUses.ProduceSeekerKeeperItem("torch").Contains("Poor torch"), "Seeker Keeper Inscrutable Pockets must reset after rest.");
 Assert(SettlementFactionService.CraftJarredFireHours(true, new ScriptedRandom(3)) == 3 && SettlementFactionService.BlackHelmMemoryLossBenefit(2, new ScriptedRandom(1, 6)) == (7, 2) && SettlementFactionService.GraftFromWillingHost(true, new ScriptedRandom(4)) == (4, 1), "Settlement faction abilities must preserve their source dice and resource conversions.");
+var generatedRuin = RuinGenerationRules.Generate([3, 2, 4, 1, 5]);
+Assert(generatedRuin.Rooms.Count == 15 && generatedRuin.Rooms.GroupBy(room => room.SourceFaceIndex).Select(group => group.Count()).SequenceEqual([3, 2, 4, 1, 5]), "Ruin generation must create room counts from each of the five visible d6 faces.");
+Assert(generatedRuin.Passages.Count >= generatedRuin.Rooms.Count - 1 && IsConnected(generatedRuin), "Generated Ruin rooms must be connected by passages.");
+Assert(RuinGenerationRules.RollAndGenerate(new ScriptedRandom(1, 2, 3, 4, 5)).VisibleFaces.SequenceEqual([1, 2, 3, 4, 5]), "Ruin generation must roll five visible d6 faces when they are not supplied.");
 var collisionState = local.ToState() with
 {
     RoamingHazards = [
@@ -397,6 +401,23 @@ static bool ThrowsInvalidOperation(Action action)
     try { action(); }
     catch (InvalidOperationException) { return true; }
     return false;
+}
+
+static bool IsConnected(GeneratedRuin ruin)
+{
+    var adjacent = ruin.Passages
+        .SelectMany(passage => new[] { (From: passage.From, To: passage.To), (From: passage.To, To: passage.From) })
+        .GroupBy(edge => edge.From)
+        .ToDictionary(group => group.Key, group => group.Select(edge => edge.To));
+    var visited = new HashSet<GridCoord> { ruin.Rooms[0].Coordinate };
+    var pending = new Queue<GridCoord>(visited);
+    while (pending.TryDequeue(out var current))
+    {
+        if (!adjacent.TryGetValue(current, out var neighbours)) continue;
+        foreach (var neighbour in neighbours.Where(visited.Add)) pending.Enqueue(neighbour);
+    }
+
+    return visited.Count == ruin.Rooms.Select(room => room.Coordinate).Distinct().Count();
 }
 
 static Dictionary<int, WastesEntry> CreateWastesOutcomes(WastesEntry entry) =>

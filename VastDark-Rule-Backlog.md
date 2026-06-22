@@ -70,7 +70,7 @@ Content tables are data tasks: every table row must become data and must be vali
 
 ## Ruins and the Deep
 
-- [ ] **R-24 - Ruin graph generation** (p. 20). Generate visible rooms, passages, and initial ruin layout. Pseudocode: `rollVisibleRooms(); connectRooms(); markEntrances()`. Test graph connectivity and documented room count.
+- [x] **R-24 - Ruin graph generation** (p. 20). Implemented five-visible-face ruin graph construction: a face-up cluster and north/south/east/west attached lines, with rooms and connecting passages. Pseudocode: `rollFiveVisibleFaces -> centralCluster -> attachFourLines -> connectPassages`. Tests verify source-face room counts, deterministic rolls, and graph connectivity.
 - [ ] **R-25 - Ruin exploration and getting lost** (p. 21). Encode movement constraints, navigation/room discovery, and ruin-specific lost outcomes. Pseudocode: `exploreRoom -> updateGraph -> resolveLostIfTriggered`. Test new layout and loop prevention.
 - [ ] **R-26 - Ruin room table** (pp. 22-27). Encode two-d6 room construction and all room-specific hazards, searches, and saves as data. Pseudocode: `room = combine(roomTypeD6, roomDetailD6); resolveRoom(room)`. Test every table row and every required save/cost.
 - [ ] **R-27 - Ruin room features** (p. 28). Encode `1d20 + depth` feature table, including unstable collapse. Pseudocode: `featureTotal=d20+depth; applyFeature(feature)`. Test depth offsets and room-removal effects.
