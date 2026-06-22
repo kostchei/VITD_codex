@@ -180,6 +180,9 @@ var discoveries = new RuinDiscoveryTracker();
 var discoveryRoom = new GridCoord(4, 4);
 Assert(discoveries.EnterRoom(1, discoveryRoom, new ScriptedRandom(18)).Discovered == false && discoveries.EnterRoom(1, new GridCoord(5, 4), new ScriptedRandom(19, 5)) is { Discovered: true, CheckTotal: 20, Discovery: { Name: "Lost Habitation" } }, "Ruin Remnants must trigger at 20+ on 1d20 + depth.");
 Assert(!discoveries.EnterRoom(1, discoveryRoom, new ScriptedRandom(20, 1)).Discovered, "A Ruin room must not resolve a discovery more than once.");
+Assert(RuinEncounterRules.Get(1).Name == "Nothing" && RuinEncounterRules.Get(22).Name == "Wyrm" && RuinEncounterRules.Get(99).Name == "Wyrm", "Ruin encounter totals must cover the source 1d12 + depth table through 22+.");
+Assert(RuinEncounterRules.GetMood("Bandits", 3).Name == "Tribute" && RuinEncounterRules.GetMood("Delvers", 1).Name == "Vicious" && RuinEncounterRules.GetMood("Delvers", 6).Name == "Helpful", "Ruin Bandit and Delver mood bands must match page 30.");
+Assert(RuinEncounterRules.GetStatBlock("Bandits") == new RuinCreatureStatRule("Bandits", 2, 10, "Hide", "Attack as weapon; retreats at half health.") && RuinEncounterRules.GetStatBlock("Delvers").HitDice == 5, "Page 30 short stat blocks must retain their combat values.");
 var collisionState = local.ToState() with
 {
     RoamingHazards = [
