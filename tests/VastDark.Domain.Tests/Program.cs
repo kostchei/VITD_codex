@@ -121,6 +121,13 @@ Assert(WastesFactionService.TryShareBurden(burdenBearer, new Traveler("Ally"), w
 Assert(WastesFactionService.HuntInWastes(true, true, true, new ScriptedRandom(6)) == 6 && WastesFactionService.HuntInWastes(false, true, true, new ScriptedRandom(6)) == 0, "Dust Anglers must require Wastes travel, tools, and a day to gain 1d6 rations.");
 WastesFactionService.SubstituteForTool(burdenBearer);
 Assert(burdenBearer.Exhaustion == 2, "Pillar Worms must gain one exhaustion to substitute a useful tool.");
+var miningInventory = new TravelerInventory(4);
+var gathering = PillarMiningService.WorkHour(PillarWork.Gathering, hasMiningTools: false, miningInventory, new ScriptedRandom(2, 6));
+Assert(gathering.RawLodestoneRolled == 2 && gathering.RawLodestoneCollected == 2 && gathering.EncounterRollModifier == 6 && miningInventory.UsedSlots == 2, "Pillar gathering must yield 1d2 raw lodestone, consume one slot each, and add 1d6 to encounters.");
+var mining = PillarMiningService.WorkHour(PillarWork.Mining, hasMiningTools: true, miningInventory, new ScriptedRandom(6, 5, 4));
+Assert(mining.RawLodestoneRolled == 6 && mining.RawLodestoneCollected == 2 && mining.EncounterRollModifier == 9 && miningInventory.UsedSlots == 4, "Pillar mining must require tools, roll 1d6 lodestone, add 2d6 encounter pressure, and respect inventory slots.");
+Assert(PillarMiningService.RefineAtSettlement(miningInventory, 2, new ScriptedRandom(1, 10)) == 110 && miningInventory.UsedSlots == 2, "Each raw lodestone must refine at a settlement for 1d10 × 10 coins and free its slot.");
+AssertThrows(() => PillarMiningService.WorkHour(PillarWork.Mining, hasMiningTools: false, new TravelerInventory(1), new ScriptedRandom()), "Pillar mining without tools must be rejected.");
 var collisionState = local.ToState() with
 {
     RoamingHazards = [

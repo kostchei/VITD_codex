@@ -96,6 +96,15 @@ public sealed class TravelerInventory
         _items.Add(item);
     }
 
+    public void RemoveRecordedItems(string name, int count)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        if (count < 1) throw new ArgumentOutOfRangeException(nameof(count));
+        var matches = _items.Where(item => string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase)).Take(count).ToList();
+        if (matches.Count != count) throw new InvalidOperationException("The requested recorded items are not available.");
+        foreach (var item in matches) _items.Remove(item);
+    }
+
     private void ConsumeLoadoutSlots(string purpose, int slots)
     {
         var remaining = _loadoutSlots[purpose] - slots;
