@@ -175,6 +175,11 @@ Assert(RuinFeatureRules.Get(1).Single().Name == "Warning" && RuinFeatureRules.Ge
 Assert(RuinFeatureRules.Get(25).Select(feature => feature.Name).SequenceEqual(["Vein of Metal", "Hideout"]) && RuinFeatureRules.Get(24).Count == 0, "Ruin feature data must preserve the printed duplicate 25 and missing 24.");
 var collapsedRuin = RuinCollapseService.CollapseRoom(generatedRuin, new GridCoord(0, 0));
 Assert(collapsedRuin.Rooms.All(room => room.Coordinate != new GridCoord(0, 0)) && collapsedRuin.Passages.All(passage => passage.From != new GridCoord(0, 0) && passage.To != new GridCoord(0, 0)), "An Unstable room collapse must remove the room and all its pathways.");
+Assert(Enumerable.Range(1, 6).Select(RuinDiscoveryRules.Get).Select(rule => rule.Name).Distinct().Count() == 6, "Every Ruin discovery d6 face must resolve to source content.");
+var discoveries = new RuinDiscoveryTracker();
+var discoveryRoom = new GridCoord(4, 4);
+Assert(discoveries.EnterRoom(1, discoveryRoom, new ScriptedRandom(18)).Discovered == false && discoveries.EnterRoom(1, new GridCoord(5, 4), new ScriptedRandom(19, 5)) is { Discovered: true, CheckTotal: 20, Discovery: { Name: "Lost Habitation" } }, "Ruin Remnants must trigger at 20+ on 1d20 + depth.");
+Assert(!discoveries.EnterRoom(1, discoveryRoom, new ScriptedRandom(20, 1)).Discovered, "A Ruin room must not resolve a discovery more than once.");
 var collisionState = local.ToState() with
 {
     RoamingHazards = [
