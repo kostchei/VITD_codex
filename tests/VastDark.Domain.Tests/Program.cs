@@ -32,6 +32,20 @@ Assert(local.RoamingHazards.Keys.Distinct().Count() == originalHazardFaces.Lengt
 Assert(local.RoamingHazards.Values.Order().SequenceEqual(originalHazardFaces), "Moving hazards must preserve their face values.");
 Assert(LocalMap.GetRoamingHazardName(4) == "Void Lightning", "Hazard names must match their d6 result.");
 
+var noAssetNavigation = DailyNavigationService.Resolve([], new ScriptedRandom(1));
+Assert(noAssetNavigation.IsLost && noAssetNavigation.Effect == LostEffect.UtterlyLost && noAssetNavigation.RequiresRepeatedNavigation, "A roll of 1 without navigation assets must leave the party utterly lost.");
+var dangerousNavigation = DailyNavigationService.Resolve([], new ScriptedRandom(2));
+Assert(dangerousNavigation.Effect == LostEffect.DangerouslyOffCourse && dangerousNavigation.DistanceMiles == 12, "A roll of 2 without assets must leave the party dangerously off course by 12 miles.");
+var offCourseNavigation = DailyNavigationService.Resolve([], new ScriptedRandom(3));
+Assert(offCourseNavigation.Effect == LostEffect.OffCourse && offCourseNavigation.DistanceMiles == 6, "A roll of 3 without assets must leave the party off course by 6 miles.");
+var lateNavigation = DailyNavigationService.Resolve([], new ScriptedRandom(4));
+Assert(lateNavigation.Effect == LostEffect.Late && lateNavigation.DistanceMiles == 6, "A roll of 4 without assets must leave the party late by 6 miles.");
+Assert(!DailyNavigationService.Resolve([], new ScriptedRandom(6)).IsLost, "A roll of 6 must navigate successfully without assets.");
+var preparedNavigation = DailyNavigationService.Resolve([NavigationAsset.Landmark, NavigationAsset.Directions, NavigationAsset.Tool, NavigationAsset.Light], new ScriptedRandom(1));
+Assert(preparedNavigation.LostChanceInSix == 1 && preparedNavigation.Effect == LostEffect.Late, "Four distinct navigation assets must reduce the remaining failure to the Late effect shown in the source example.");
+Assert(!DailyNavigationService.Resolve([NavigationAsset.Landmark, NavigationAsset.Directions, NavigationAsset.Tool, NavigationAsset.Light, NavigationAsset.DeadReckoning], new ScriptedRandom(1)).IsLost, "Five distinct navigation assets must reduce the lost chance to zero.");
+Assert(DailyNavigationService.Resolve([NavigationAsset.Light, NavigationAsset.Light], new ScriptedRandom(4)).IsLost, "Duplicate navigation assets must not reduce the lost chance more than once.");
+
 var clearWeather = new TravelEventTable([new TravelEventDefinition("Clear skies")]);
 var quietEncounter = new TravelEventTable([new TravelEventDefinition("No encounter")]);
 var unusedDeck = new WastesDeck([
