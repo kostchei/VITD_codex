@@ -92,7 +92,7 @@ for (var step = 0; step < PartyTravelState.NormalDailyMiles; step++)
 Assert(movementCampaign.PartyTravel.DailyMiles == 18 && movementCampaign.PartyTravel.RestRequired, "The party must require rest after 18 local miles.");
 Assert(!movementCampaign.TryMoveParty(partyRegionalCoordinate, firstStep).Moved, "The party cannot move after 18 miles without forced marching or resting.");
 var forcedMarch = movementCampaign.TryBeginForcedMarch();
-Assert(forcedMarch.Moved && movementCampaign.PartyTravel.DailyMileLimit == 24 && movementCampaign.PartyTravel.Exhaustion == 1, "Forced march must add one exhaustion and six more miles of travel.");
+Assert(forcedMarch.Moved && movementCampaign.PartyTravel.DailyMileLimit == 24 && movementCampaign.Party.TotalExhaustion == 1, "Forced march must add one exhaustion and six more miles of travel.");
 for (var step = 0; step < PartyTravelState.ForcedMarchMiles; step++)
 {
     var target = step % 2 == 0 ? firstStep : HexCoord.Zero;
@@ -100,10 +100,10 @@ for (var step = 0; step < PartyTravelState.ForcedMarchMiles; step++)
 }
 
 Assert(movementCampaign.PartyTravel.DailyMiles == 24 && movementCampaign.PartyTravel.RestRequired, "The party must require rest after its forced march allowance is used.");
-movementCampaign.PartyTravel.AddRations(1);
-Assert(movementCampaign.TryRestParty().Moved && movementCampaign.PartyTravel.DailyMiles == 0 && movementCampaign.PartyTravel.Day == 2 && movementCampaign.PartyTravel.Rations == 0, "Rest must consume one ration, begin a new travel day, and reset daily miles.");
-var exhaustionBeforeUnfedRest = movementCampaign.PartyTravel.Exhaustion;
-Assert(movementCampaign.TryRestParty().Moved && movementCampaign.PartyTravel.Exhaustion == exhaustionBeforeUnfedRest + 1, "Rest without a ration must add one exhaustion level.");
+movementCampaign.Party.Members[0].AddRations(1);
+Assert(movementCampaign.TryRestParty().Moved && movementCampaign.PartyTravel.DailyMiles == 0 && movementCampaign.PartyTravel.Day == 2 && movementCampaign.Party.TotalRations == 0, "Rest must consume one ration, begin a new travel day, and reset daily miles.");
+var exhaustionBeforeUnfedRest = movementCampaign.Party.TotalExhaustion;
+Assert(movementCampaign.TryRestParty().Moved && movementCampaign.Party.TotalExhaustion == exhaustionBeforeUnfedRest + 1, "Rest without a ration must add one exhaustion level.");
 
 var boundaryCampaign = new Campaign(new Random(97531));
 var boundaryOrigin = boundaryCampaign.PartyTravel.RegionalCoordinate;
@@ -144,6 +144,11 @@ try
 {
     var generatedCampaign = new Campaign(new Random(56789));
     var generatedLocal = generatedCampaign.GetLocalMap(new RegionalCoord(2, 2));
+    var generatedTraveler = generatedCampaign.Party.Members[0];
+    generatedTraveler.AddRations(2);
+    generatedTraveler.SetSkill("Survival", 3);
+    generatedTraveler.SetResource("Water", 4);
+    generatedTraveler.AddCondition("Irradiated");
     CampaignFile.Save(generatedCampaign, savePath);
     var loadedCampaign = CampaignFile.LoadOrCreate(savePath);
     Assert(loadedCampaign.Regional.DiceRolls.Count == RegionalMap.DiceCount, "Saved regional dice must reload.");
@@ -166,6 +171,11 @@ try
            loadedCampaign.PartyTravel.LocalCoordinate == generatedCampaign.PartyTravel.LocalCoordinate &&
            loadedCampaign.PartyTravel.DailyMiles == generatedCampaign.PartyTravel.DailyMiles,
         "Saved party travel state must reload exactly.");
+    Assert(loadedCampaign.Party.Members.Select(member => member.Name).SequenceEqual(generatedCampaign.Party.Members.Select(member => member.Name)),
+        "Saved party members must reload exactly.");
+    var loadedTraveler = loadedCampaign.Party.Members[0];
+    Assert(loadedTraveler.Rations == 2 && loadedTraveler.GetSkill("Survival") == 3 && loadedTraveler.GetResource("Water") == 4 && loadedTraveler.Conditions.Contains("Irradiated"),
+        "Saved party supplies, skills, resources, and conditions must reload exactly.");
 }
 finally
 {

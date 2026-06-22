@@ -7,9 +7,9 @@ public sealed class PartyTravelState
     public const int NormalDailyMiles = 18;
     public const int ForcedMarchMiles = 6;
 
-    public PartyTravelState(RegionalCoord regionalCoordinate, HexCoord localCoordinate, int day = 1, int dailyMiles = 0, int exhaustion = 0, bool forcedMarchUsed = false, int rations = 0)
+    public PartyTravelState(RegionalCoord regionalCoordinate, HexCoord localCoordinate, int day = 1, int dailyMiles = 0, bool forcedMarchUsed = false)
     {
-        if (day < 1 || dailyMiles is < 0 or > NormalDailyMiles + ForcedMarchMiles || exhaustion < 0 || rations < 0)
+        if (day < 1 || dailyMiles is < 0 or > NormalDailyMiles + ForcedMarchMiles)
         {
             throw new ArgumentOutOfRangeException(nameof(day), "Party travel state contains an invalid value.");
         }
@@ -23,32 +23,18 @@ public sealed class PartyTravelState
         LocalCoordinate = localCoordinate;
         Day = day;
         DailyMiles = dailyMiles;
-        Exhaustion = exhaustion;
         ForcedMarchUsed = forcedMarchUsed;
-        Rations = rations;
     }
 
     public RegionalCoord RegionalCoordinate { get; private set; }
     public HexCoord LocalCoordinate { get; private set; }
     public int Day { get; private set; }
     public int DailyMiles { get; private set; }
-    public int Exhaustion { get; private set; }
-    public int Rations { get; private set; }
     public bool ForcedMarchUsed { get; private set; }
     public int DailyMileLimit => ForcedMarchUsed ? NormalDailyMiles + ForcedMarchMiles : NormalDailyMiles;
     public bool RestRequired => DailyMiles >= DailyMileLimit;
     public bool CanForcedMarch => DailyMiles == NormalDailyMiles && !ForcedMarchUsed;
     public bool CanRest => true;
-
-    public void AddRations(int amount)
-    {
-        if (amount < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(amount));
-        }
-
-        Rations += amount;
-    }
 
     internal void MoveTo(RegionalCoord regionalCoordinate, HexCoord localCoordinate)
     {
@@ -62,7 +48,7 @@ public sealed class PartyTravelState
         DailyMiles++;
     }
 
-    internal void BeginForcedMarch()
+    internal void BeginForcedMarch(TravelParty party)
     {
         if (!CanForcedMarch)
         {
@@ -70,25 +56,31 @@ public sealed class PartyTravelState
         }
 
         ForcedMarchUsed = true;
-        Exhaustion++;
+        foreach (var traveler in party.Members)
+        {
+            traveler.AddExhaustion(1);
+        }
     }
 
-    internal bool Rest()
+    internal PartyRestResult Rest(TravelParty party)
     {
-        var consumedRation = Rations > 0;
-        if (consumedRation)
+        var fedTravelers = 0;
+        foreach (var traveler in party.Members)
         {
-            Rations--;
-        }
-        else
-        {
-            Exhaustion++;
+            if (traveler.ConsumeRation())
+            {
+                fedTravelers++;
+            }
+            else
+            {
+                traveler.AddExhaustion(1);
+            }
         }
 
         Day++;
         DailyMiles = 0;
         ForcedMarchUsed = false;
-        return consumedRation;
+        return new PartyRestResult(fedTravelers, party.Members.Count - fedTravelers);
     }
 
     internal PartyTravelStateState ToState() => new(
@@ -98,9 +90,11 @@ public sealed class PartyTravelState
         LocalCoordinate.R,
         Day,
         DailyMiles,
-        Exhaustion,
-        ForcedMarchUsed,
-        Rations);
+        Exhaustion: 0,
+        ForcedMarchUsed: ForcedMarchUsed,
+        Rations: 0);
 }
 
 public sealed record PartyMoveResult(bool Moved, string Message, int DailyMiles, int DailyMileLimit, bool RestRequired);
+
+public sealed record PartyRestResult(int FedTravelers, int UnfedTravelers);

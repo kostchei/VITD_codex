@@ -276,7 +276,8 @@ public partial class MapScreen : Control
             MapLocation.Dungeon dungeon => $"Dungeon at {dungeon.RegionalCoordinate}, depth {dungeon.Depth}",
             _ => string.Empty,
         };
-        _travelLabel.Text = $"Party: {partyTravel.LocalCoordinate} in {partyTravel.RegionalCoordinate} | Day {partyTravel.Day} | {partyTravel.DailyMiles} / {partyTravel.DailyMileLimit} miles | Rations {partyTravel.Rations} | Exhaustion {partyTravel.Exhaustion}";
+        var party = _navigation.Campaign.Party;
+        _travelLabel.Text = $"Party: {partyTravel.LocalCoordinate} in {partyTravel.RegionalCoordinate} | Day {partyTravel.Day} | {partyTravel.DailyMiles} / {partyTravel.DailyMileLimit} miles | Rations {party.TotalRations} | Exhaustion {party.TotalExhaustion}";
         _mapCanvas?.Refresh();
     }
 

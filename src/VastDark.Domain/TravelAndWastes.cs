@@ -33,6 +33,29 @@ public sealed class Traveler
         Rations = rations;
     }
 
+    public Traveler(TravelerState state)
+        : this(
+            state?.Name ?? throw new ArgumentNullException(nameof(state)),
+            state.Health,
+            state.Rations)
+    {
+        AddExhaustion(state.Exhaustion);
+        foreach (var skill in state.Skills ?? [])
+        {
+            SetSkill(skill.Name, skill.Value);
+        }
+
+        foreach (var resource in state.Resources ?? [])
+        {
+            SetResource(resource.Name, resource.Value);
+        }
+
+        foreach (var condition in state.Conditions ?? [])
+        {
+            AddCondition(condition);
+        }
+    }
+
     public string Name { get; }
     public int Health { get; private set; }
     public int Rations { get; private set; }
@@ -69,6 +92,16 @@ public sealed class Traveler
 
         Rations--;
         return true;
+    }
+
+    public void AddRations(int amount)
+    {
+        if (amount < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(amount));
+        }
+
+        Rations += amount;
     }
 
     public void AddExhaustion(int levels)
@@ -114,6 +147,15 @@ public sealed class Traveler
         ArgumentException.ThrowIfNullOrWhiteSpace(condition);
         _conditions.Add(condition);
     }
+
+    public TravelerState ToState() => new(
+        Name,
+        Health,
+        Rations,
+        Exhaustion,
+        _skills.OrderBy(skill => skill.Key).Select(skill => new NamedValueState(skill.Key, skill.Value)).ToList(),
+        _resources.OrderBy(resource => resource.Key).Select(resource => new NamedValueState(resource.Key, resource.Value)).ToList(),
+        _conditions.Order().ToList());
 }
 
 public sealed class TravelParty
@@ -132,6 +174,8 @@ public sealed class TravelParty
 
     public IReadOnlyList<Traveler> Members => _members;
     public bool MustStopTraveling { get; private set; }
+    public int TotalRations => _members.Sum(member => member.Rations);
+    public int TotalExhaustion => _members.Sum(member => member.Exhaustion);
 
     public int BestSkill(string skill) => _members.Max(member => member.GetSkill(skill));
 
@@ -140,6 +184,8 @@ public sealed class TravelParty
     public void RequireRest() => MustStopTraveling = true;
 
     public void CompleteRest() => MustStopTraveling = false;
+
+    public PartyState ToState() => new(_members.Select(member => member.ToState()).ToList());
 }
 
 public sealed record TravelSegment

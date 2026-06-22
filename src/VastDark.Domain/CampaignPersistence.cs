@@ -8,6 +8,19 @@ public sealed record LocalCellState(int Q, int R, Terrain Terrain, int? DieRoll)
 
 public sealed record RoamingHazardState(int Q, int R, int DieRoll);
 
+public sealed record NamedValueState(string Name, int Value);
+
+public sealed record TravelerState(
+    string Name,
+    int Health,
+    int Rations,
+    int Exhaustion,
+    List<NamedValueState>? Skills = null,
+    List<NamedValueState>? Resources = null,
+    List<string>? Conditions = null);
+
+public sealed record PartyState(List<TravelerState> Members);
+
 public sealed record LocalMapState(
     int ParentColumn,
     int ParentRow,
@@ -32,7 +45,8 @@ public sealed record PartyTravelStateState(
 public sealed record CampaignState(
     List<RegionalCellState> RegionalCells,
     List<LocalMapState> LocalMaps,
-    PartyTravelStateState? PartyTravel = null);
+    PartyTravelStateState? PartyTravel = null,
+    PartyState? Party = null);
 
 public static class CampaignFile
 {

@@ -24,6 +24,7 @@ public sealed class Campaign
         _random = random ?? Random.Shared;
         Regional = new RegionalMap(_random);
         Dungeon = PrototypeDungeonBuilder.CreateSixLevelDungeon();
+        Party = new TravelParty([new Traveler("Expedition")]);
         PartyTravel = new PartyTravelState(new RegionalCoord(0, 0), HexCoord.Zero);
     }
 
@@ -43,15 +44,24 @@ public sealed class Campaign
             }
         }
 
-        PartyTravel = state.PartyTravel is { } partyState
+        var legacyTravelState = state.PartyTravel;
+        Party = state.Party?.Members is { Count: > 0 } members
+            ? new TravelParty(members.Select(member => new Traveler(member)))
+            : new TravelParty([new Traveler(
+                "Expedition",
+                rations: legacyTravelState?.Rations ?? 0)]);
+        if (state.Party is null && legacyTravelState is { Exhaustion: > 0 })
+        {
+            Party.Members[0].AddExhaustion(legacyTravelState.Exhaustion);
+        }
+
+        PartyTravel = legacyTravelState is { } partyState
             ? new PartyTravelState(
                 new RegionalCoord(partyState.RegionalColumn, partyState.RegionalRow),
                 new HexCoord(partyState.LocalQ, partyState.LocalR),
                 partyState.Day,
                 partyState.DailyMiles,
-                partyState.Exhaustion,
-                partyState.ForcedMarchUsed,
-                partyState.Rations)
+                partyState.ForcedMarchUsed)
             : new PartyTravelState(new RegionalCoord(0, 0), HexCoord.Zero);
 
         if (!Regional.Contains(PartyTravel.RegionalCoordinate) || !GetLocalMap(PartyTravel.RegionalCoordinate).VisibleCells.Contains(PartyTravel.LocalCoordinate))
@@ -62,12 +72,14 @@ public sealed class Campaign
 
     public RegionalMap Regional { get; }
     public Dungeon Dungeon { get; }
+    public TravelParty Party { get; }
     public PartyTravelState PartyTravel { get; }
 
     public CampaignState ToState() => new(
         Regional.ToState().ToList(),
         _localMaps.Values.Select(map => map.ToState()).ToList(),
-        PartyTravel.ToState());
+        PartyTravel.ToState(),
+        Party.ToState());
 
     public LocalMap GetLocalMap(RegionalCoord coordinate)
     {
@@ -165,10 +177,10 @@ public sealed class Campaign
             return MoveFailed("Forced march is available after 18 miles and before resting.");
         }
 
-        PartyTravel.BeginForcedMarch();
+        PartyTravel.BeginForcedMarch(Party);
         return new PartyMoveResult(
             true,
-            $"Forced march started: 1 exhaustion gained. Travel allowance is now {PartyTravel.DailyMileLimit} miles.",
+            $"Forced march started: each party member gains 1 exhaustion. Travel allowance is now {PartyTravel.DailyMileLimit} miles.",
             PartyTravel.DailyMiles,
             PartyTravel.DailyMileLimit,
             PartyTravel.RestRequired);
@@ -176,12 +188,13 @@ public sealed class Campaign
 
     public PartyMoveResult TryRestParty()
     {
-        var consumedRation = PartyTravel.Rest();
+        var restResult = PartyTravel.Rest(Party);
+        var rationMessage = restResult.UnfedTravelers == 0
+            ? $"The party rests and consumes {restResult.FedTravelers} ration(s)."
+            : $"The party rests: {restResult.FedTravelers} ration(s) consumed; {restResult.UnfedTravelers} member(s) gain 1 exhaustion from hunger.";
         return new PartyMoveResult(
             true,
-            consumedRation
-                ? $"The party rests and consumes 1 ration. Day {PartyTravel.Day} begins with 18 miles available."
-                : $"The party rests without a ration and gains 1 exhaustion. Day {PartyTravel.Day} begins with 18 miles available.",
+            $"{rationMessage} Day {PartyTravel.Day} begins with 18 miles available.",
             PartyTravel.DailyMiles,
             PartyTravel.DailyMileLimit,
             PartyTravel.RestRequired);
