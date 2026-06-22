@@ -232,6 +232,9 @@ var terrainDayParty = new TravelParty([new Traveler("Terrain Day")]);
 var wastesDay = TerrainDayEventService.ResolveDay(Terrain.Wastes, terrainDayParty, new ScriptedRandom(6, 6, 12));
 Assert(wastesDay.Weather is { Rule.Effect: WastesWeatherEffect.DuneWave } && wastesDay.Encounter?.Name == "Caravan" && terrainDayParty.TotalExhaustion == 1, "A Wastes day must resolve its 2d6 weather effects and weather-modified encounter at the day checkpoint.");
 Assert(TerrainDayEventService.ResolveDay(Terrain.Pillars, terrainDayParty, new ScriptedRandom()) is { Weather: null, Encounter: null }, "Pillar daily checkpoints must not invent a weather/encounter procedure absent from the source.");
+var registeredRoomEffects = RuinRoomRegistry.Get(4, 5).Concat(RuinRoomRegistry.Get(1, 1)).Concat(RuinRoomRegistry.Get(6, 6)).ToArray();
+Assert(registeredRoomEffects.All(room => RuinRoomEffectRules.Get(room.Code, room.Name).Count == 1) && RuinRoomEffectRules.All.Count == 36, "Every printed Ruin room row, including both duplicate 45 entries, must have a source-linked effect definition.");
+Assert(RuinRoomEffectRules.Get(15,"Oubliette").Single().Save == "Breath" && RuinRoomEffectRules.Get(63,"Quarry").Single().Damage == "5d6" && RuinRoomEffectRules.Get(42,"Dump").Single().Procedure.Contains("3-in-6"), "Ruin room effect data must preserve required saves, damage, searches, and chance branches.");
 var collisionState = local.ToState() with
 {
     RoamingHazards = [
