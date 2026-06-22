@@ -195,7 +195,20 @@ Assert(dungeon.GetLevel(5).Width == 32 && dungeon.GetLevel(5).Height == 24, "Dun
 Assert(dungeon.GetLevel(0).GetTile(new GridCoord(20, 8)) == DungeonTile.StairDown, "Level zero must descend.");
 Assert(dungeon.GetLevel(5).GetTile(new GridCoord(6, 6)) == DungeonTile.StairUp, "Bottom level must ascend.");
 
-var navigation = new MapNavigationService(new Campaign());
+var navigationCampaign = new Campaign(new Random(24680));
+var navigationState = navigationCampaign.ToState() with
+{
+    PartyTravel = new PartyTravelStateState(
+        Campaign.DungeonRegionalCoordinate.Column,
+        Campaign.DungeonRegionalCoordinate.Row,
+        Campaign.DungeonLocalCoordinate.Q,
+        Campaign.DungeonLocalCoordinate.R,
+        Day: 1,
+        DailyMiles: 0,
+        Exhaustion: 0,
+        ForcedMarchUsed: false),
+};
+var navigation = new MapNavigationService(new Campaign(navigationState));
 navigation.SelectRegional(Campaign.DungeonRegionalCoordinate);
 navigation.EnterLocal(Campaign.DungeonRegionalCoordinate);
 Assert(navigation.TryEnterDungeon(), "Dungeon entrance must be reachable from its local map.");

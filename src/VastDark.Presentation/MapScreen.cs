@@ -260,7 +260,8 @@ public partial class MapScreen : Control
         var current = _navigation.Current;
         _localButton.Disabled = current is MapLocation.Local;
         _dungeonButton.Disabled = current is not MapLocation.Local currentLocal ||
-                                  !_navigation.Campaign.HasDungeonEntrance(currentLocal.RegionalCoordinate);
+                                  !_navigation.Campaign.HasDungeonEntrance(currentLocal.RegionalCoordinate) ||
+                                  !_navigation.Campaign.IsPartyAtDungeonEntrance;
         var partyTravel = _navigation.Campaign.PartyTravel;
         var viewingPartyLocalMap = current is MapLocation.Local partyLocal && partyLocal.RegionalCoordinate == partyTravel.RegionalCoordinate;
         _movePartyButton.Disabled = !viewingPartyLocalMap || _mapCanvas?.SelectedLocalCoordinate is null || partyTravel.RestRequired;

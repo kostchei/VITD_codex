@@ -109,6 +109,9 @@ public sealed class Campaign
     public bool HasDungeonEntrance(RegionalCoord regionalCoordinate) =>
         regionalCoordinate == DungeonRegionalCoordinate;
 
+    public bool IsPartyAtDungeonEntrance =>
+        PartyTravel.RegionalCoordinate == DungeonRegionalCoordinate && PartyTravel.LocalCoordinate == DungeonLocalCoordinate;
+
     public IReadOnlyList<RegionalCoord> GetLocalArea(RegionalCoord centre)
     {
         if (!Regional.Contains(centre))
@@ -275,7 +278,7 @@ public sealed class MapNavigationService
 
     public bool TryEnterDungeon()
     {
-        if (Current is not MapLocation.Local local || !Campaign.HasDungeonEntrance(local.RegionalCoordinate))
+        if (Current is not MapLocation.Local local || !Campaign.HasDungeonEntrance(local.RegionalCoordinate) || !Campaign.IsPartyAtDungeonEntrance)
         {
             return false;
         }
