@@ -224,6 +224,10 @@ Assert(CrawlCreatureRules.CyclopsCallsAlly(new ScriptedRandom(1)) && !CrawlCreat
 Assert(CrawlCreatureRules.HarpyMeld(false,false,false,new ScriptedRandom(6,3)) == (true,6,3) && !CrawlCreatureRules.HarpyMeld(true,false,false,new ScriptedRandom()).Adheres && CrawlCreatureRules.GriffonSwallows(15,false), "Harpy Meld protections and Griffon Devour threshold must match the source.");
 Assert(CrawlCreatureRules.HydraFrenzyAttacks(new ScriptedRandom(1,6)) == 6 && CrawlCreatureRules.HydraVenom(false,new ScriptedRandom(3,2)) == (3,2) && CrawlCreatureRules.ShadeEyeBite(new ScriptedRandom(1,3)) == (true,3), "Hydra and Shade special branches must retain source dice and saves.");
 Assert(CrawlCreatureRules.OgreSpawnCount(10,new ScriptedRandom(6)) == 6 && CrawlCreatureRules.OgreSpawnCount(11,new ScriptedRandom(6)) == 0 && CrawlCreatureRules.WyrmHowl(false,new ScriptedRandom(6,6,6,6)) == (18,true,6) && CrawlCreatureRules.WyrmHowl(true,new ScriptedRandom(6,6,6)) == (9,false,0), "Ogre Split and Wyrm Howl must preserve their source thresholds, damage, and save result.");
+var dailyUses = new DailyUseTracker();
+Assert(dailyUses.TryUse("Spell Eater") && !dailyUses.TryUse("spell eater") && dailyUses.TryUse("Oracle Skull"), "Explicit once-per-day source effects must be independently gated by normalized effect identity.");
+dailyUses.ResetDay();
+Assert(dailyUses.TryUse("Spell Eater"), "Daily-use gates must reset on a new day.");
 var collisionState = local.ToState() with
 {
     RoamingHazards = [
