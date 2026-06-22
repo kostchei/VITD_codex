@@ -36,6 +36,11 @@ Assert(local.RoamingHazards.Count == originalHazardFaces.Length, "Advancing haza
 Assert(local.RoamingHazards.Keys.Distinct().Count() == originalHazardFaces.Length, "Roaming hazards must occupy distinct cells after moving.");
 Assert(local.RoamingHazards.Values.Order().SequenceEqual(originalHazardFaces), "Moving hazards must preserve their face values.");
 Assert(Enumerable.Range(1, 6).Select(LocalMap.GetRoamingHazardName).SequenceEqual(["Warband", "Maelstrom", "Crawlherd", "Collapse", "Void Lightning", "Singing Sand"]), "Roaming hazard names must match the full page 11 d6 table.");
+Assert(VitalityRules.StartingGrit(2, 1, [5, 7]) == 13 && VitalityRules.StartingFlesh(2, 3) == 5, "Starting Grit and Flesh must follow the page 7 formulas.");
+var absorbedDamage = VitalityRules.ApplyDamage(new Vitality(6, 4), 5);
+Assert(absorbedDamage.Vitality == new Vitality(1, 4) && absorbedDamage.FleshDamage == 0, "Grit must absorb damage before Flesh.");
+var fleshDamage = VitalityRules.ApplyDamage(new Vitality(2, 4), 5);
+Assert(fleshDamage.Vitality.Flesh == 1 && fleshDamage.FleshDamage == 3 && fleshDamage.InjuryRequired, "Damage beyond Grit must reduce Flesh and require an injury.");
 Assert(RoamingHazardRules.Get(1).EncounterDiceSides == 6 && RoamingHazardRules.Get(1).Kind == RoamingHazardResolutionKind.Combat, "Warband must spawn 5d6 Cutthroats led by a Demagogue.");
 Assert(RoamingHazardRules.Get(2).DamageDice == "3d20" && RoamingHazardRules.Get(2).Avoidance!.Contains("shelter", StringComparison.Ordinal), "Maelstrom must use 3d20 damage and shelter avoidance.");
 Assert(RoamingHazardRules.Get(3).EncounterDiceSides == 20, "Crawlherd must spawn 1d20 Crawl.");
