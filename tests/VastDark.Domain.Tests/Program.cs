@@ -114,6 +114,13 @@ Assert(WastesWeatherService.Resolve(12, weatherParty, new WastesWeatherContext(R
 Assert(Enumerable.Range(1, 18).Select(WastesEncounterRules.GetEncounter).All(rule => !string.IsNullOrWhiteSpace(rule.Name)) && WastesEncounterRules.GetEncounter(7).RequiresMood && WastesEncounterRules.GetEncounter(13).RequiresMood, "Every Wastes encounter total must resolve and the three source mood encounters must require a mood roll.");
 Assert(WastesEncounterRules.GetMood("Nomads", 1).Name == "Cautious" && WastesEncounterRules.GetMood("Nomads", 6).Name == "Friendly" && WastesEncounterRules.GetMood("Bandits", 3).Name == "Tribute" && WastesEncounterRules.GetMood("Cutthroats", 6).Name == "Recruit", "Wastes mood bands must match the source d6 tables.");
 Assert(Enumerable.Range(1, 20).Select(WastesEncounterRules.GetCuriosity).Select(curiosity => curiosity.Name).Distinct().Count() == 20 && WastesEncounterRules.GetCuriosity(11).Description.Contains("landmark", StringComparison.OrdinalIgnoreCase), "Every Wastes curiosity d20 face must resolve to unique source content.");
+Assert(Enum.GetValues<WastesFaction>().Select(WastesFactionRules.Get).All(rule => !string.IsNullOrWhiteSpace(rule.TrainingRequirement)) && WastesFactionRules.Get(WastesFaction.PillarWorms).AbilityName == "Grit and Bear It", "Every page 13 Wastes faction must retain its ability and training requirement.");
+Assert(WastesFactionService.CanBarterWithoutCost(false, false) && WastesFactionService.CanBarterWithoutCost(true, true) && !WastesFactionService.CanBarterWithoutCost(false, true), "Lodestone Brokers must barter only matching common or magic item categories at no cost.");
+var burdenBearer = new Traveler("Bearer");
+Assert(WastesFactionService.TryShareBurden(burdenBearer, new Traveler("Ally"), withinArmsReach: true, allyWouldGainExhaustion: false, allyWouldLoseMemory: true) && burdenBearer.Exhaustion == 1 && !WastesFactionService.TryShareBurden(burdenBearer, new Traveler("Distant"), withinArmsReach: false, allyWouldGainExhaustion: false, allyWouldLoseMemory: true), "Candlekeepers must transfer either listed burden only in arm's reach.");
+Assert(WastesFactionService.HuntInWastes(true, true, true, new ScriptedRandom(6)) == 6 && WastesFactionService.HuntInWastes(false, true, true, new ScriptedRandom(6)) == 0, "Dust Anglers must require Wastes travel, tools, and a day to gain 1d6 rations.");
+WastesFactionService.SubstituteForTool(burdenBearer);
+Assert(burdenBearer.Exhaustion == 2, "Pillar Worms must gain one exhaustion to substitute a useful tool.");
 var collisionState = local.ToState() with
 {
     RoamingHazards = [
