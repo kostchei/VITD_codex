@@ -36,6 +36,12 @@ Assert(local.RoamingHazards.Count == originalHazardFaces.Length, "Advancing haza
 Assert(local.RoamingHazards.Keys.Distinct().Count() == originalHazardFaces.Length, "Roaming hazards must occupy distinct cells after moving.");
 Assert(local.RoamingHazards.Values.Order().SequenceEqual(originalHazardFaces), "Moving hazards must preserve their face values.");
 Assert(Enumerable.Range(1, 6).Select(LocalMap.GetRoamingHazardName).SequenceEqual(["Warband", "Maelstrom", "Crawlherd", "Collapse", "Void Lightning", "Singing Sand"]), "Roaming hazard names must match the full page 11 d6 table.");
+Assert(RoamingHazardRules.Get(1).EncounterDiceSides == 6 && RoamingHazardRules.Get(1).Kind == RoamingHazardResolutionKind.Combat, "Warband must spawn 5d6 Cutthroats led by a Demagogue.");
+Assert(RoamingHazardRules.Get(2).DamageDice == "3d20" && RoamingHazardRules.Get(2).Avoidance!.Contains("shelter", StringComparison.Ordinal), "Maelstrom must use 3d20 damage and shelter avoidance.");
+Assert(RoamingHazardRules.Get(3).EncounterDiceSides == 20, "Crawlherd must spawn 1d20 Crawl.");
+Assert(RoamingHazardRules.Get(4).TerrainDestructionChanceInSix == 2, "Collapse must have a 2-in-6 terrain destruction chance.");
+Assert(RoamingHazardRules.Get(5).DamageDice == "10d6" && RoamingHazardRules.Get(5).TerrainDestructionChanceInSix == 3, "Void Lightning must use a 3-in-6 metal strike for 10d6 damage.");
+Assert(RoamingHazardRules.Get(6).SaveType == "Breath", "Singing Sand must require a Breath save.");
 var collisionState = local.ToState() with
 {
     RoamingHazards = [
