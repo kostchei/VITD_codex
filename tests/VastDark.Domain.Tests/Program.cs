@@ -45,6 +45,16 @@ Assert(scoredTraveler.GetAbilityScore(Ability.Constitution) == 14 && scoredTrave
 Assert(new Traveler(scoredTraveler.ToState()).AbilityScores == scores && new Traveler("Legacy").AbilityScores == AbilityScores.Average, "Traveler ability scores must persist while legacy travelers receive average scores.");
 Assert(InventoryRules.GetPack(PackType.Bindle) == new PackRule(PackType.Bindle, 2, 20) && InventoryRules.GetPack(PackType.Backpack) == new PackRule(PackType.Backpack, 10, 120), "Pack slots and costs must match page 7.");
 Assert(InventoryRules.DailyMilesWithTransport(18, CargoTransportType.Pulk, 1) == 12 && InventoryRules.DailyMilesWithTransport(18, CargoTransportType.Sleigh, 2) == 12 && InventoryRules.DailyMilesWithTransport(18, CargoTransportType.Sleigh, 3) == 18, "Cargo transport speed restrictions must match page 7 puller limits.");
+var inventory = new TravelerInventory(scoredTraveler.GetAbilityModifier(Ability.Constitution));
+Assert(inventory.Capacity == 2, "A Traveler's base inventory slots must equal their Constitution bonus.");
+Assert(inventory.AssignLoadoutAtSettlement("Navigation", 2, availableCoins: 20, atSettlement: true) == 20 && inventory.UsedSlots == 2, "Settlement loadouts must cost 10 coins and reserve their slots.");
+inventory.DrawCommonItem("Navigation", new InventoryItem("Compass", 1));
+Assert(inventory.Items.Single().Name == "Compass" && inventory.Loadouts.Single().Slots == 1 && inventory.UsedSlots == 2, "A common item must replace, not add to, its assigned loadout slots.");
+var packCost = inventory.BuyPackAtSettlement(PackType.Backpack, availableCoins: 120, atSettlement: true);
+inventory.RecordOwnItem(new InventoryItem("Relic", 3, isUniqueOrMagical: true));
+Assert(packCost == 120 && inventory.Capacity == 12 && inventory.AvailableSlots == 7, "Packs must expand capacity and unique items must consume their own slots.");
+AssertThrows(() => inventory.AssignLoadoutAtSettlement("Defense", 1, 10, atSettlement: false), "Inventory loadouts must be restricted to settlements.");
+AssertThrows(() => inventory.DrawCommonItem("Navigation", new InventoryItem("Magic Compass", 1, isUniqueOrMagical: true)), "Unique or magical items cannot be drawn from a common-item loadout.");
 var absorbedDamage = VitalityRules.ApplyDamage(new Vitality(6, 4), 5);
 Assert(absorbedDamage.Vitality == new Vitality(1, 4) && absorbedDamage.FleshDamage == 0, "Grit must absorb damage before Flesh.");
 var fleshDamage = VitalityRules.ApplyDamage(new Vitality(2, 4), 5);
@@ -273,6 +283,20 @@ static void Assert(bool condition, string message)
     {
         throw new InvalidOperationException(message);
     }
+}
+
+static void AssertThrows(Action action, string message)
+{
+    try
+    {
+        action();
+    }
+    catch (InvalidOperationException)
+    {
+        return;
+    }
+
+    throw new InvalidOperationException(message);
 }
 
 static Dictionary<int, WastesEntry> CreateWastesOutcomes(WastesEntry entry) =>
