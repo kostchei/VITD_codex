@@ -34,8 +34,9 @@ public partial class MapCanvas : Control
     private float _zoom = 1f;
     private bool _dragging;
     private string _viewKey = string.Empty;
+    private MapLocation? _lastLocation;
     private RegionalCoord? _selectedRegional;
-    private HexCoord? _selectedLocal;
+    private LocalMapCoord? _selectedLocal;
     private GridCoord? _selectedGrid;
 
     public MapCanvas(MapNavigationService navigation)
@@ -47,12 +48,13 @@ public partial class MapCanvas : Control
 
     public event Action<string>? CellSelected;
 
-    public HexCoord? SelectedLocalCoordinate => _selectedLocal;
+    public LocalMapCoord? SelectedLocalCoordinate => _selectedLocal;
 
     public void SetNavigation(MapNavigationService navigation)
     {
         _navigation = navigation;
         _viewKey = string.Empty;
+        _lastLocation = null;
         _selectedRegional = null;
         _selectedLocal = null;
         _selectedGrid = null;
@@ -62,7 +64,8 @@ public partial class MapCanvas : Control
     public void Refresh()
     {
         var nextKey = _navigation.Current.ToString() ?? string.Empty;
-        if (_viewKey != nextKey)
+        var preserveLocalViewport = _lastLocation is MapLocation.Local && _navigation.Current is MapLocation.Local;
+        if (_viewKey != nextKey && !preserveLocalViewport)
         {
             _viewKey = nextKey;
             _pan = GetMapCentre();
@@ -71,7 +74,26 @@ public partial class MapCanvas : Control
             _selectedLocal = null;
             _selectedGrid = null;
         }
+        else
+        {
+            _viewKey = nextKey;
+        }
 
+        _lastLocation = _navigation.Current;
+
+        QueueRedraw();
+    }
+
+    public void RecentreOnParty()
+    {
+        _pan = _navigation.Current switch
+        {
+            MapLocation.Local => LocalWorldCentre(
+                _navigation.Campaign.PartyTravel.RegionalCoordinate,
+                _navigation.Campaign.PartyTravel.LocalCoordinate),
+            MapLocation.Regional => RegionalCentre(_navigation.Campaign.PartyTravel.RegionalCoordinate),
+            _ => _pan,
+        };
         QueueRedraw();
     }
 
@@ -89,7 +111,7 @@ public partial class MapCanvas : Control
                 DrawRegionalMap();
                 break;
             case MapLocation.Local local:
-                DrawLocalMap(_navigation.Campaign.GetLocalMap(local.RegionalCoordinate));
+                DrawLocalArea(local.RegionalCoordinate);
                 break;
             case MapLocation.Dungeon dungeon:
                 DrawDungeonMap(_navigation.Campaign.Dungeon.GetLevel(dungeon.Depth));
@@ -138,37 +160,44 @@ public partial class MapCanvas : Control
         }
     }
 
-    private void DrawLocalMap(LocalMap map)
+    private void DrawLocalArea(RegionalCoord centre)
     {
-        var regionalBoundary = CreateFlatTopHex(Vector2.Zero, LocalRegionalRadius);
-        foreach (var cell in map.Cells)
+        var reachableMoves = _navigation.Campaign.GetAvailablePartyMoves().ToHashSet();
+        foreach (var regionalCoordinate in _navigation.Campaign.GetLocalArea(centre))
         {
-            var isEntrance = map.Parent == Campaign.DungeonRegionalCoordinate && cell == Campaign.DungeonLocalCoordinate;
-            DrawClippedHex(
-                LocalCentre(cell),
-                LocalHexRadius,
-                regionalBoundary,
-                map.GetTerrain(cell),
-                map.VisibleCells.Contains(cell),
-                _selectedLocal == cell,
-                isEntrance ? new Color("d97735") : null);
-        }
-
-        foreach (var (coordinate, dieRoll) in map.RoamingHazards)
-        {
-            if (map.VisibleCells.Contains(coordinate))
+            var map = _navigation.Campaign.GetLocalMap(regionalCoordinate);
+            var regionalBoundary = CreateFlatTopHex(ChunkCentre(regionalCoordinate), LocalRegionalRadius);
+            foreach (var cell in map.Cells)
             {
-                DrawRoamingHazard(LocalCentre(coordinate), dieRoll);
+                var location = new LocalMapCoord(regionalCoordinate, cell);
+                var isEntrance = map.Parent == Campaign.DungeonRegionalCoordinate && cell == Campaign.DungeonLocalCoordinate;
+                DrawClippedHex(
+                    LocalWorldCentre(regionalCoordinate, cell),
+                    LocalHexRadius,
+                    regionalBoundary,
+                    map.GetTerrain(cell),
+                    map.VisibleCells.Contains(cell),
+                    _selectedLocal == location,
+                    isEntrance ? new Color("d97735") : null);
+                if (reachableMoves.Contains(location))
+                {
+                    DrawMovementOption(LocalWorldCentre(regionalCoordinate, cell));
+                }
             }
+
+            foreach (var (coordinate, dieRoll) in map.RoamingHazards)
+            {
+                if (map.VisibleCells.Contains(coordinate))
+                {
+                    DrawRoamingHazard(LocalWorldCentre(regionalCoordinate, coordinate), dieRoll);
+                }
+            }
+
+            DrawPolygonBorder(regionalBoundary, RegionalOutline, Math.Max(2f, _zoom * 2f));
         }
 
         var partyTravel = _navigation.Campaign.PartyTravel;
-        if (map.Parent == partyTravel.RegionalCoordinate && map.VisibleCells.Contains(partyTravel.LocalCoordinate))
-        {
-            DrawPartyMarker(LocalCentre(partyTravel.LocalCoordinate), LocalHexRadius);
-        }
-
-        DrawPolygonBorder(regionalBoundary, RegionalOutline, Math.Max(2f, _zoom * 2f));
+        DrawPartyMarker(LocalWorldCentre(partyTravel.RegionalCoordinate, partyTravel.LocalCoordinate), LocalHexRadius);
     }
 
     private void DrawDungeonMap(DungeonLevel level)
@@ -284,6 +313,12 @@ public partial class MapCanvas : Control
             Colors.White);
     }
 
+    private void DrawMovementOption(Vector2 worldCentre)
+    {
+        var centre = ToScreen(worldCentre);
+        DrawArc(centre, 10f * _zoom, 0f, Mathf.Tau, 20, new Color("d6a928"), Math.Max(1.5f, _zoom * 2f), true);
+    }
+
     private static Vector2[] CreateFlatTopHex(Vector2 centre, float radius)
     {
         var points = new Vector2[6];
@@ -394,7 +429,7 @@ public partial class MapCanvas : Control
                 SelectRegional(screenPosition);
                 break;
             case MapLocation.Local local:
-                SelectLocal(screenPosition, _navigation.Campaign.GetLocalMap(local.RegionalCoordinate));
+                SelectLocal(screenPosition, local.RegionalCoordinate);
                 break;
             case MapLocation.Dungeon dungeon:
                 SelectDungeon(screenPosition, _navigation.Campaign.Dungeon.GetLevel(dungeon.Depth));
@@ -424,13 +459,15 @@ public partial class MapCanvas : Control
         CellSelected?.Invoke($"Regional hex {selected.Value}\n\nTerrain: {terrain}\nScale: 6 miles per hex.\n\nThis regional hex owns one local map.");
     }
 
-    private void SelectLocal(Vector2 screenPosition, LocalMap map)
+    private void SelectLocal(Vector2 screenPosition, RegionalCoord centre)
     {
-        var selected = map.Cells
-            .Select(cell => (Cell: cell, Distance: ToScreen(LocalCentre(cell)).DistanceTo(screenPosition)))
+        var selected = _navigation.Campaign.GetLocalArea(centre)
+            .SelectMany(regionalCoordinate => _navigation.Campaign.GetLocalMap(regionalCoordinate).VisibleCells
+                .Select(cell => new LocalMapCoord(regionalCoordinate, cell)))
+            .Select(location => (Location: location, Distance: ToScreen(LocalWorldCentre(location.RegionalCoordinate, location.LocalCoordinate)).DistanceTo(screenPosition)))
             .Where(candidate => candidate.Distance <= LocalHexRadius * _zoom)
             .OrderBy(candidate => candidate.Distance)
-            .Select(candidate => (HexCoord?)candidate.Cell)
+            .Select(candidate => (LocalMapCoord?)candidate.Location)
             .FirstOrDefault();
 
         if (selected is null)
@@ -439,12 +476,14 @@ public partial class MapCanvas : Control
         }
 
         _selectedLocal = selected;
-        var isEntrance = map.Parent == Campaign.DungeonRegionalCoordinate && selected == Campaign.DungeonLocalCoordinate;
-        var terrain = map.GetTerrain(selected.Value);
-        var hazardText = map.RoamingHazards.TryGetValue(selected.Value, out var dieRoll)
+        var map = _navigation.Campaign.GetLocalMap(selected.Value.RegionalCoordinate);
+        var isEntrance = map.Parent == Campaign.DungeonRegionalCoordinate && selected.Value.LocalCoordinate == Campaign.DungeonLocalCoordinate;
+        var terrain = map.GetTerrain(selected.Value.LocalCoordinate);
+        var hazardText = map.RoamingHazards.TryGetValue(selected.Value.LocalCoordinate, out var dieRoll)
             ? $"\n\nRoaming hazard: {LocalMap.GetRoamingHazardName(dieRoll)} (d6: {dieRoll})."
             : string.Empty;
-        CellSelected?.Invoke($"Local subhex {selected.Value}\n\nTerrain: {terrain}\nScale: 1 mile per subhex.\nLocal footprint: 6 subhexes along each regional-hex edge (12 flat-to-flat).{hazardText}{(isEntrance ? "\n\nOrange marker: dungeon entrance." : string.Empty)}");
+        var reachable = _navigation.Campaign.GetAvailablePartyMoves().Contains(selected.Value) ? "\n\nReachable: move party here costs 1 mile." : string.Empty;
+        CellSelected?.Invoke($"Local subhex {selected.Value.LocalCoordinate} in regional hex {selected.Value.RegionalCoordinate}\n\nTerrain: {terrain}\nScale: 1 mile per subhex.{reachable}{hazardText}{(isEntrance ? "\n\nOrange marker: dungeon entrance." : string.Empty)}");
     }
 
     private void SelectDungeon(Vector2 screenPosition, DungeonLevel level)
@@ -473,7 +512,7 @@ public partial class MapCanvas : Control
     private Vector2 GetMapCentre() => _navigation.Current switch
     {
         MapLocation.Regional => RegionalCentre(new RegionalCoord(RegionalMap.Width / 2, RegionalMap.Height / 2)),
-        MapLocation.Local => Vector2.Zero,
+        MapLocation.Local local => ChunkCentre(local.RegionalCoordinate),
         MapLocation.Dungeon dungeon => new Vector2(
             _navigation.Campaign.Dungeon.GetLevel(dungeon.Depth).Width * DungeonTileSize / 2f,
             _navigation.Campaign.Dungeon.GetLevel(dungeon.Depth).Height * DungeonTileSize / 2f),
@@ -487,6 +526,13 @@ public partial class MapCanvas : Control
     private static Vector2 LocalCentre(HexCoord coordinate) => new(
         coordinate.Q * LocalHexRadius * 1.5f,
         (coordinate.R + coordinate.Q * 0.5f) * LocalHexRadius * Mathf.Sqrt(3f));
+
+    private static Vector2 ChunkCentre(RegionalCoord coordinate) => new(
+        coordinate.Column * LocalRegionalRadius * 1.5f,
+        (coordinate.Row + (coordinate.Column % 2) * 0.5f) * LocalRegionalRadius * Mathf.Sqrt(3f));
+
+    private static Vector2 LocalWorldCentre(RegionalCoord regionalCoordinate, HexCoord localCoordinate) =>
+        ChunkCentre(regionalCoordinate) + LocalCentre(localCoordinate);
 
     private static Color TerrainFill(Terrain terrain) => terrain switch
     {

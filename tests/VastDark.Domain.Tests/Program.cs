@@ -105,6 +105,20 @@ Assert(movementCampaign.TryRestParty().Moved && movementCampaign.PartyTravel.Dai
 var exhaustionBeforeUnfedRest = movementCampaign.PartyTravel.Exhaustion;
 Assert(movementCampaign.TryRestParty().Moved && movementCampaign.PartyTravel.Exhaustion == exhaustionBeforeUnfedRest + 1, "Rest without a ration must add one exhaustion level.");
 
+var boundaryCampaign = new Campaign(new Random(97531));
+var boundaryOrigin = boundaryCampaign.PartyTravel.RegionalCoordinate;
+var boundaryPath = FindBoundaryPath(boundaryCampaign.GetLocalMap(boundaryOrigin), boundaryCampaign.Regional, boundaryOrigin);
+foreach (var coordinate in boundaryPath.Skip(1))
+{
+    Assert(boundaryCampaign.TryMoveParty(boundaryOrigin, coordinate).Moved, "The party must be able to walk to a local-map boundary.");
+}
+
+var boundaryExit = boundaryCampaign.GetAvailablePartyMoves().First(move => move.RegionalCoordinate != boundaryOrigin);
+Assert(boundaryCampaign.TryMoveParty(boundaryExit.RegionalCoordinate, boundaryExit.LocalCoordinate).Moved, "The party must be able to cross a local-map edge into an adjacent regional chunk.");
+Assert(boundaryCampaign.PartyTravel.RegionalCoordinate == boundaryExit.RegionalCoordinate &&
+       boundaryCampaign.PartyTravel.LocalCoordinate == boundaryExit.LocalCoordinate,
+    "A boundary crossing must update the party's regional and local coordinates.");
+
 var ruinsLocal = new LocalMap(new RegionalCoord(0, 0), Terrain.Ruins, new Random(23456));
 Assert(ruinsLocal.DiceCount is 6 or 12 or 32, "Local density must choose 6, 12, or 32 dice.");
 Assert(ruinsLocal.DiceRolls.Count == ruinsLocal.DiceCount, "Local dice must occupy distinct hexes.");
@@ -188,6 +202,45 @@ static void Assert(bool condition, string message)
 
 static Dictionary<int, WastesEntry> CreateWastesOutcomes(WastesEntry entry) =>
     Enumerable.Range(2, 17).ToDictionary(total => total, _ => entry);
+
+static IReadOnlyList<HexCoord> FindBoundaryPath(LocalMap map, RegionalMap regional, RegionalCoord origin)
+{
+    var visited = new HashSet<HexCoord> { HexCoord.Zero };
+    var previous = new Dictionary<HexCoord, HexCoord>();
+    var queue = new Queue<HexCoord>();
+    queue.Enqueue(HexCoord.Zero);
+
+    while (queue.Count > 0)
+    {
+        var current = queue.Dequeue();
+        for (var direction = 0; direction < HexCoord.Directions.Count; direction++)
+        {
+            if (!map.VisibleCells.Contains(current.Neighbour(direction)) && regional.GetNeighbour(origin, direction) is not null)
+            {
+                var path = new List<HexCoord> { current };
+                while (path[^1] != HexCoord.Zero)
+                {
+                    path.Add(previous[path[^1]]);
+                }
+
+                path.Reverse();
+                return path;
+            }
+        }
+
+        for (var direction = 0; direction < HexCoord.Directions.Count; direction++)
+        {
+            var next = current.Neighbour(direction);
+            if (map.VisibleCells.Contains(next) && visited.Add(next))
+            {
+                previous.Add(next, current);
+                queue.Enqueue(next);
+            }
+        }
+    }
+
+    throw new InvalidOperationException("No reachable local-map boundary was found.");
+}
 
 sealed class ScriptedRandom(params int[] values) : IRandomSource
 {

@@ -1,5 +1,7 @@
 namespace VastDark.Domain;
 
+public readonly record struct LocalMapCoord(RegionalCoord RegionalCoordinate, HexCoord LocalCoordinate);
+
 public sealed class PartyTravelState
 {
     public const int NormalDailyMiles = 18;
@@ -48,14 +50,15 @@ public sealed class PartyTravelState
         Rations += amount;
     }
 
-    internal void MoveTo(HexCoord coordinate)
+    internal void MoveTo(RegionalCoord regionalCoordinate, HexCoord localCoordinate)
     {
         if (RestRequired)
         {
             throw new InvalidOperationException("The party must rest before moving again.");
         }
 
-        LocalCoordinate = coordinate;
+        RegionalCoordinate = regionalCoordinate;
+        LocalCoordinate = localCoordinate;
         DailyMiles++;
     }
 

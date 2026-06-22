@@ -87,6 +87,26 @@ public sealed class RegionalMap
 
     public bool Contains(RegionalCoord coordinate) => _cells.Contains(coordinate);
 
+    public RegionalCoord? GetNeighbour(RegionalCoord coordinate, int direction)
+    {
+        if (!Contains(coordinate))
+        {
+            throw new ArgumentOutOfRangeException(nameof(coordinate));
+        }
+
+        if (direction < 0 || direction >= HexCoord.Directions.Count)
+        {
+            throw new ArgumentOutOfRangeException(nameof(direction));
+        }
+
+        var axialRow = coordinate.Row - FloorDivide(coordinate.Column, 2);
+        var offset = HexCoord.Directions[direction];
+        var column = coordinate.Column + offset.Q;
+        var row = axialRow + offset.R + FloorDivide(column, 2);
+        var neighbour = new RegionalCoord(column, row);
+        return Contains(neighbour) ? neighbour : null;
+    }
+
     public Terrain GetTerrain(RegionalCoord coordinate) => _terrain[coordinate];
 
     public RegionalCellState[] ToState() => _cells
@@ -98,6 +118,9 @@ public sealed class RegionalMap
         .ToArray();
 
     internal static int RollD6(Random random) => random.Next(1, 7);
+
+    private static int FloorDivide(int value, int divisor) =>
+        value >= 0 ? value / divisor : -(((-value) + divisor - 1) / divisor);
 
     private static bool ContainsGridCoordinate(RegionalCoord coordinate) =>
         coordinate.Column >= 0 && coordinate.Column < Width && coordinate.Row >= 0 && coordinate.Row < Height;

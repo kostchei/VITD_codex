@@ -88,33 +88,73 @@ public sealed class Campaign
     public bool HasDungeonEntrance(RegionalCoord regionalCoordinate) =>
         regionalCoordinate == DungeonRegionalCoordinate;
 
+    public IReadOnlyList<RegionalCoord> GetLocalArea(RegionalCoord centre)
+    {
+        if (!Regional.Contains(centre))
+        {
+            throw new ArgumentOutOfRangeException(nameof(centre));
+        }
+
+        var area = new List<RegionalCoord> { centre };
+        for (var direction = 0; direction < HexCoord.Directions.Count; direction++)
+        {
+            if (Regional.GetNeighbour(centre, direction) is { } neighbour)
+            {
+                area.Add(neighbour);
+            }
+        }
+
+        return area;
+    }
+
+    public IReadOnlyList<LocalMapCoord> GetAvailablePartyMoves()
+    {
+        if (PartyTravel.RestRequired)
+        {
+            return [];
+        }
+
+        var originRegion = PartyTravel.RegionalCoordinate;
+        var originMap = GetLocalMap(originRegion);
+        var moves = new List<LocalMapCoord>();
+        for (var direction = 0; direction < HexCoord.Directions.Count; direction++)
+        {
+            var adjacent = PartyTravel.LocalCoordinate.Neighbour(direction);
+            if (originMap.VisibleCells.Contains(adjacent))
+            {
+                moves.Add(new LocalMapCoord(originRegion, adjacent));
+                continue;
+            }
+
+            if (Regional.GetNeighbour(originRegion, direction) is { } destinationRegion)
+            {
+                moves.Add(new LocalMapCoord(destinationRegion, FindBoundaryEntry(originRegion, PartyTravel.LocalCoordinate, direction, destinationRegion)));
+            }
+        }
+
+        return moves;
+    }
+
     public PartyMoveResult TryMoveParty(RegionalCoord localMapCoordinate, HexCoord target)
     {
-        if (PartyTravel.RegionalCoordinate != localMapCoordinate)
-        {
-            return MoveFailed("The party is in a different regional hex.");
-        }
-
-        var map = GetLocalMap(localMapCoordinate);
-        if (!map.VisibleCells.Contains(target))
-        {
-            return MoveFailed("The selected local hex cannot be entered.");
-        }
-
         if (PartyTravel.RestRequired)
         {
             return MoveFailed("Rest is required before the party can move again.");
         }
 
-        if (PartyTravel.LocalCoordinate.DistanceTo(target) != 1)
+        var destination = new LocalMapCoord(localMapCoordinate, target);
+        if (!GetAvailablePartyMoves().Contains(destination))
         {
-            return MoveFailed("The party can move only to an adjacent local hex.");
+            return MoveFailed("The selected hex is not reachable in one local-mile move.");
         }
 
-        PartyTravel.MoveTo(target);
+        var crossedRegionalBoundary = PartyTravel.RegionalCoordinate != localMapCoordinate;
+        PartyTravel.MoveTo(localMapCoordinate, target);
         var message = PartyTravel.RestRequired
             ? $"Moved 1 mile. {PartyTravel.DailyMiles} / {PartyTravel.DailyMileLimit} miles; rest is required."
-            : $"Moved 1 mile. {PartyTravel.DailyMiles} / {PartyTravel.DailyMileLimit} miles.";
+            : crossedRegionalBoundary
+                ? $"Crossed into regional hex {localMapCoordinate}. Moved 1 mile; {PartyTravel.DailyMiles} / {PartyTravel.DailyMileLimit} miles."
+                : $"Moved 1 mile. {PartyTravel.DailyMiles} / {PartyTravel.DailyMileLimit} miles.";
         return new PartyMoveResult(true, message, PartyTravel.DailyMiles, PartyTravel.DailyMileLimit, PartyTravel.RestRequired);
     }
 
@@ -153,6 +193,32 @@ public sealed class Campaign
         PartyTravel.DailyMiles,
         PartyTravel.DailyMileLimit,
         PartyTravel.RestRequired);
+
+    private HexCoord FindBoundaryEntry(RegionalCoord originRegion, HexCoord originLocal, int direction, RegionalCoord destinationRegion)
+    {
+        var step = Subtract(LocalCentre(originLocal.Neighbour(direction)), LocalCentre(originLocal));
+        var target = Add(Add(ChunkCentre(originRegion), LocalCentre(originLocal)), step);
+        return GetLocalMap(destinationRegion).VisibleCells
+            .OrderBy(candidate => DistanceSquared(Add(ChunkCentre(destinationRegion), LocalCentre(candidate)), target))
+            .ThenBy(candidate => candidate.Q)
+            .ThenBy(candidate => candidate.R)
+            .First();
+    }
+
+    private static (double X, double Y) ChunkCentre(RegionalCoord coordinate) =>
+        (coordinate.Column * 9d, (coordinate.Row + (coordinate.Column % 2) * 0.5d) * 6d * Math.Sqrt(3d));
+
+    private static (double X, double Y) LocalCentre(HexCoord coordinate) =>
+        (coordinate.Q * 1.5d, (coordinate.R + coordinate.Q * 0.5d) * Math.Sqrt(3d));
+
+    private static (double X, double Y) Subtract((double X, double Y) left, (double X, double Y) right) =>
+        (left.X - right.X, left.Y - right.Y);
+
+    private static (double X, double Y) Add((double X, double Y) left, (double X, double Y) right) =>
+        (left.X + right.X, left.Y + right.Y);
+
+    private static double DistanceSquared((double X, double Y) left, (double X, double Y) right) =>
+        (left.X - right.X) * (left.X - right.X) + (left.Y - right.Y) * (left.Y - right.Y);
 }
 
 public sealed class MapNavigationService

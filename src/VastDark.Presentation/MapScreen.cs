@@ -18,6 +18,7 @@ public partial class MapScreen : Control
     private readonly Button _movePartyButton = new() { Text = "Move party here" };
     private readonly Button _forcedMarchButton = new() { Text = "Forced march (+6 miles)" };
     private readonly Button _restButton = new() { Text = "Rest" };
+    private readonly Button _recentrePartyButton = new() { Text = "Recentre on party" };
     private readonly MenuButton _campaignMenu = new() { Text = "Campaign" };
     private readonly ConfirmationDialog _newCampaignConfirmation = new()
     {
@@ -67,6 +68,7 @@ public partial class MapScreen : Control
         travelRow.AddChild(_movePartyButton);
         travelRow.AddChild(_forcedMarchButton);
         travelRow.AddChild(_restButton);
+        travelRow.AddChild(_recentrePartyButton);
         root.AddChild(travelRow);
 
         var depthRow = new HBoxContainer();
@@ -117,6 +119,7 @@ public partial class MapScreen : Control
         _movePartyButton.Pressed += MovePartyToSelectedHex;
         _forcedMarchButton.Pressed += BeginForcedMarch;
         _restButton.Pressed += RestParty;
+        _recentrePartyButton.Pressed += RecentreOnParty;
         _campaignMenu.GetPopup().AddItem("New regional map", NewRegionalMapMenuId);
         _campaignMenu.GetPopup().IdPressed += ShowCampaignMenuAction;
         _newCampaignConfirmation.Confirmed += StartNewRegionalMap;
@@ -185,14 +188,26 @@ public partial class MapScreen : Control
             return;
         }
 
-        var result = _navigation.Campaign.TryMoveParty(local.RegionalCoordinate, target);
+        var result = _navigation.Campaign.TryMoveParty(target.RegionalCoordinate, target.LocalCoordinate);
         if (result.Moved)
         {
+            if (_navigation.Campaign.PartyTravel.RegionalCoordinate != local.RegionalCoordinate)
+            {
+                _navigation.EnterLocal(_navigation.Campaign.PartyTravel.RegionalCoordinate);
+            }
+
             CampaignFile.Save(_navigation.Campaign, _campaignPath);
         }
 
         _inspector.Text = result.Message;
         RefreshUi();
+    }
+
+    private void RecentreOnParty()
+    {
+        _navigation.EnterLocal(_navigation.Campaign.PartyTravel.RegionalCoordinate);
+        RefreshUi();
+        _mapCanvas?.RecentreOnParty();
     }
 
     private void BeginForcedMarch()
