@@ -128,6 +128,8 @@ var mining = PillarMiningService.WorkHour(PillarWork.Mining, hasMiningTools: tru
 Assert(mining.RawLodestoneRolled == 6 && mining.RawLodestoneCollected == 2 && mining.EncounterRollModifier == 9 && miningInventory.UsedSlots == 4, "Pillar mining must require tools, roll 1d6 lodestone, add 2d6 encounter pressure, and respect inventory slots.");
 Assert(PillarMiningService.RefineAtSettlement(miningInventory, 2, new ScriptedRandom(1, 10)) == 110 && miningInventory.UsedSlots == 2, "Each raw lodestone must refine at a settlement for 1d10 × 10 coins and free its slot.");
 AssertThrows(() => PillarMiningService.WorkHour(PillarWork.Mining, hasMiningTools: false, new TravelerInventory(1), new ScriptedRandom()), "Pillar mining without tools must be rejected.");
+Assert(Enumerable.Range(1, 14).Select(PillarEncounterRules.Get).All(rule => !string.IsNullOrWhiteSpace(rule.Name)) && PillarEncounterRules.Get(15).Name == "Griffon" && PillarEncounterRules.Get(99).Name == "Griffon", "Pillar encounter results must resolve every documented total and cap 15+ as Griffon.");
+Assert(PillarEncounterRules.GetMood("Lodestone Miners", 1).Name == "Territorial" && PillarEncounterRules.GetMood("Lodestone Miners", 5).Name == "Friendly" && PillarEncounterRules.GetMood("Bandits", 3).Name == "Tribute" && PillarEncounterRules.GetMood("Cutthroats", 6).Name == "Recruit", "Pillar encounter mood bands must match the source.");
 var collisionState = local.ToState() with
 {
     RoamingHazards = [
