@@ -160,6 +160,15 @@ var generatedRuin = RuinGenerationRules.Generate([3, 2, 4, 1, 5]);
 Assert(generatedRuin.Rooms.Count == 15 && generatedRuin.Rooms.GroupBy(room => room.SourceFaceIndex).Select(group => group.Count()).SequenceEqual([3, 2, 4, 1, 5]), "Ruin generation must create room counts from each of the five visible d6 faces.");
 Assert(generatedRuin.Passages.Count >= generatedRuin.Rooms.Count - 1 && IsConnected(generatedRuin), "Generated Ruin rooms must be connected by passages.");
 Assert(RuinGenerationRules.RollAndGenerate(new ScriptedRandom(1, 2, 3, 4, 5)).VisibleFaces.SequenceEqual([1, 2, 3, 4, 5]), "Ruin generation must roll five visible d6 faces when they are not supplied.");
+var exploration = new RuinExploration(RuinGenerationRules.Generate([2, 1, 1, 1, 1]), new GridCoord(0, 0));
+Assert(!exploration.TryMoveToRoom(new GridCoord(99, 99)), "Ruin exploration must reject movement without a connecting passage.");
+Assert(exploration.TryMoveToRoom(new GridCoord(1, 0)) && exploration.ElapsedMinutes == 10, "Moving room-to-room through a connecting passage must take 10 minutes and discover the room.");
+exploration.TravelHallwayPoint();
+exploration.SearchCurrentRoom();
+Assert(exploration.ElapsedMinutes == 50 && exploration.SearchedRooms.Contains(exploration.CurrentRoom), "Hallway movement and room searching must use the documented 10/30-minute careful times.");
+var deeperRuin = RuinGenerationRules.Generate([1, 1, 1, 1, 1]);
+exploration.Descend(deeperRuin, new GridCoord(0, 0));
+Assert(exploration.Depth == 2 && exploration.Layout == deeperRuin && exploration.VisitedRooms.SetEquals([new GridCoord(0, 0)]), "A depth passage must create and enter a new Ruin layout at the next depth.");
 var collisionState = local.ToState() with
 {
     RoamingHazards = [
