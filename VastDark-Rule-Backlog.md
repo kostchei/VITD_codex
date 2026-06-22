@@ -34,6 +34,7 @@ Content tables are data tasks: every table row must become data and must be vali
 
 ## Core traveler rules
 
+- [x] **R-00 - Ability scores** (user-confirmed DCC convention). Implemented 3d6 scores with `floor((score - 10) / 2)` modifiers, including the -4 through +4 range tests. This feeds all later saves, inventory slots, Grit, and Flesh rules.
 - [ ] **R-01 - Traveler quirks table** (p. 6). Encode the 1d20 quirk table as content. Pseudocode: `quirk = rollTable(travelerQuirks, d20); applyPersistentModifier(traveler, quirk)`. Test all 20 outcomes resolve to a valid, uniquely identified quirk.
 - [ ] **R-02 - Inventory slots and loadouts** (p. 7). Model Constitution-derived slots, item slot costs, and settlement loadout assignment. Pseudocode: `require(usedSlots + item.slots <= capacity); assignLoadoutAtSettlement()`. Test capacity rejection, slot accounting, and settlement-only loadout assignment.
 - [ ] **R-03 - Exhaustion** (p. 7). Model source-tagged exhaustion and its threshold consequences. Pseudocode: `gainExhaustion(traveler, source); if thresholdReached then applyRuleEffect()`. Test each documented source and recovery path.
