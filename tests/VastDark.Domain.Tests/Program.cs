@@ -150,6 +150,12 @@ Assert(SettlementRestService.TryRecoverStorytellerExhaustion(storytellerTraveler
 Assert(Enumerable.Range(1, 12).Select(SettlementServiceRules.Get).Select(location => location.Location).Distinct().Count() == 12 && SettlementServiceRules.Get(3).Services.Count == 5, "Every page 17 settlement location and its documented services must resolve.");
 Assert(SettlementServiceRules.LodestoneCarverCoins(3) == 300 && SettlementServiceRules.ResolveRemedy(false, new ScriptedRandom(6)).Effect == "Recover 6 Grit." && SettlementServiceRules.ResolveRemedy(true, new ScriptedRandom(3)).Effect == "Recover 3 Flesh.", "Lodestone Carver value and Apothecary Remedy recovery must match the source.");
 Assert(SettlementServiceRules.ResolveMalady(new ScriptedRandom(1)).Effect == "Blinded." && SettlementServiceRules.ResolveMalady(new ScriptedRandom(2)).Effect == "2d6 damage." && SettlementServiceRules.ResolveMalady(new ScriptedRandom(3)).Effect == "Paralysis for 1 hour.", "Apothecary Malady must resolve all three documented contact outcomes.");
+Assert(Enum.GetValues<SettlementDenizen>().Select(SettlementDenizenRules.GetDenizen).All(rule => !string.IsNullOrWhiteSpace(rule.Offer) && !string.IsNullOrWhiteSpace(rule.Obligation)) && Enum.GetValues<SettlementFaction>().Select(SettlementDenizenRules.GetFaction).All(rule => !string.IsNullOrWhiteSpace(rule.TrainingRequirement)), "Every page 18 denizen and page 19 faction must retain its offer, obligation, ability, and trigger.");
+var factionUses = new SettlementFactionUses();
+Assert(factionUses.ProduceSeekerKeeperItem("rope").Contains("Poor rope") && ThrowsInvalidOperation(() => factionUses.ProduceSeekerKeeperItem("torch")), "Seeker Keeper Inscrutable Pockets must be limited to once per day.");
+factionUses.ResetDay();
+Assert(factionUses.ProduceSeekerKeeperItem("torch").Contains("Poor torch"), "Seeker Keeper Inscrutable Pockets must reset after rest.");
+Assert(SettlementFactionService.CraftJarredFireHours(true, new ScriptedRandom(3)) == 3 && SettlementFactionService.BlackHelmMemoryLossBenefit(2, new ScriptedRandom(1, 6)) == (7, 2) && SettlementFactionService.GraftFromWillingHost(true, new ScriptedRandom(4)) == (4, 1), "Settlement faction abilities must preserve their source dice and resource conversions.");
 var collisionState = local.ToState() with
 {
     RoamingHazards = [
@@ -384,6 +390,13 @@ static void AssertThrows(Action action, string message)
     }
 
     throw new InvalidOperationException(message);
+}
+
+static bool ThrowsInvalidOperation(Action action)
+{
+    try { action(); }
+    catch (InvalidOperationException) { return true; }
+    return false;
 }
 
 static Dictionary<int, WastesEntry> CreateWastesOutcomes(WastesEntry entry) =>
