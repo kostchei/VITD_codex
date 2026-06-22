@@ -45,6 +45,15 @@ Assert(AbilityScoreRules.Modifier(3) == -4 && AbilityScoreRules.Modifier(9) == -
 var travelerQuirks = Enumerable.Range(1, 20).Select(TravelerQuirkRules.Get).ToArray();
 Assert(travelerQuirks.Select(quirk => quirk.Name).Distinct().Count() == 20 && travelerQuirks.All(quirk => !string.IsNullOrWhiteSpace(quirk.RuleText)), "Every Traveler quirk d20 face must resolve to a distinct documented rule.");
 Assert(TravelerQuirkRules.Get(1).CanBeTakenMultipleTimes && TravelerQuirkRules.Roll(new ScriptedRandom(15)).Name == "Long-walker", "Ruin Plucker must be repeatable and quirk rolling must use d20 faces.");
+var harrowing = new Harrowing(["Books", "First kiss", "Knowledge", "Escape", "My name"]);
+foreach (var (trigger, memory) in Enum.GetValues<HarrowingTrigger>().Zip(["Books", "First kiss", "Knowledge", "Escape"]))
+{
+    var harrowingResult = harrowing.Resolve(trigger, losesMemory: true, memoryToLose: memory);
+    Assert(harrowingResult.MemoryLost && !harrowingResult.FinalMemoryLost, "Every documented Harrowing trigger must be able to remove a remaining memory.");
+}
+Assert(!harrowing.Resolve(HarrowingTrigger.GreatTragedy, losesMemory: false).MemoryLost, "A Harrowing trigger must not remove a memory unless the caller's source-defined chance succeeds.");
+Assert(harrowing.Resolve(HarrowingTrigger.DroppingToZeroHitPoints, losesMemory: true, "My name").FinalMemoryLost, "The fifth lost memory must signal the source-defined final-memory outcome.");
+AssertThrows(() => harrowing.Resolve(HarrowingTrigger.GreatTragedy, true, "Books"), "A lost Harrowing memory cannot be lost again.");
 var scores = new AbilityScores(3, 8, 14, 10, 18, 11);
 var scoredTraveler = new Traveler("Scored", abilityScores: scores);
 Assert(scoredTraveler.GetAbilityScore(Ability.Constitution) == 14 && scoredTraveler.GetAbilityModifier(Ability.Constitution) == 2 && scores.HighestModifier == 4, "Travelers must retain score values and derive their DCC modifiers.");
