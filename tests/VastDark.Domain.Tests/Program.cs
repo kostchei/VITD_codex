@@ -186,6 +186,11 @@ Assert(RuinEncounterRules.GetStatBlock("Bandits") == new RuinCreatureStatRule("B
 Assert(RuinTreasureRules.GetMagnitude(1) == RuinTreasureMagnitude.Useful && RuinTreasureRules.GetMagnitude(11) == RuinTreasureMagnitude.Special && RuinTreasureRules.GetMagnitude(20) == RuinTreasureMagnitude.GreatAndTerrible, "Ruin treasure magnitude must follow 1d20 + depth bands.");
 Assert(Enumerable.Range(1,12).Select(roll => RuinTreasureRules.Get(RuinTreasureMagnitude.Useful,roll)).Select(rule => rule.Name).Distinct().Count() == 12 && Enumerable.Range(1,12).Select(roll => RuinTreasureRules.Get(RuinTreasureMagnitude.Special,roll)).Select(rule => rule.Name).Distinct().Count() == 12 && Enumerable.Range(1,10).Select(roll => RuinTreasureRules.Get(RuinTreasureMagnitude.GreatAndTerrible,roll)).Select(rule => rule.Name).Distinct().Count() == 10, "Every page 31 treasure entry must be uniquely represented in its category.");
 Assert(RuinTreasureRules.Get(RuinTreasureMagnitude.Useful, 2).Effect.Contains("Once daily") && RuinTreasureRules.Get(RuinTreasureMagnitude.GreatAndTerrible, 9).Effect.Contains("Grit 0"), "Treasure data must retain source-defined persistent constraints and costs.");
+Assert(Enumerable.Range(1,10).Select(DeepGiftRules.Get).Select(rule => rule.Gift).Distinct().Count() == 10 && DeepGiftRules.Get(3).OncePerDay && DeepGiftRules.Get(6).OncePerDay, "Every Gift of the Deep d10 face and its daily limit must match page 32.");
+var deepGifts = new DeepGiftState();
+Assert(deepGifts.GainOnEnterOrNewLevel(new ScriptedRandom(3)) == DeepGift.GraftedLimbs && !deepGifts.TryUse(DeepGift.VoidOfPresence) && deepGifts.TryUse(DeepGift.GraftedLimbs) && !deepGifts.TryUse(DeepGift.GraftedLimbs), "Entering the Deep/new level must grant a gift and daily use must require ownership and remain limited.");
+deepGifts.ResetDay();
+Assert(deepGifts.TryUse(DeepGift.GraftedLimbs), "Gift daily limits must reset on a new day.");
 var collisionState = local.ToState() with
 {
     RoamingHazards = [
