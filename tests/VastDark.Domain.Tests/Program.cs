@@ -191,6 +191,10 @@ var deepGifts = new DeepGiftState();
 Assert(deepGifts.GainOnEnterOrNewLevel(new ScriptedRandom(3)) == DeepGift.GraftedLimbs && !deepGifts.TryUse(DeepGift.VoidOfPresence) && deepGifts.TryUse(DeepGift.GraftedLimbs) && !deepGifts.TryUse(DeepGift.GraftedLimbs), "Entering the Deep/new level must grant a gift and daily use must require ownership and remain limited.");
 deepGifts.ResetDay();
 Assert(deepGifts.TryUse(DeepGift.GraftedLimbs), "Gift daily limits must reset on a new day.");
+Assert(MinotaurRules.StatBlock == new MinotaurRule(20, "Cannot be harmed", "Half Standard", "Touch of the Minotaur"), "The Minotaur stat block must retain source combat constraints.");
+var minotaur = new MinotaurPursuit();
+Assert(!minotaur.EnterDeepArea(new ScriptedRandom(2)) && minotaur.EnterDeepArea(new ScriptedRandom(1)) && minotaur.HasArrived, "The Minotaur must arrive on a 1-in-6 check when entering a Deep room or area and persist afterward.");
+Assert(MinotaurRules.ResolveTouch(1, new ScriptedRandom(6)) == new MinotaurTouchResult(MinotaurTouchEffect.WitherTools, 6) && MinotaurRules.ResolveTouch(2, new ScriptedRandom(6,6,6)) == new MinotaurTouchResult(MinotaurTouchEffect.ErodeBody,18) && MinotaurRules.ResolveTouch(4, new ScriptedRandom(6)) == new MinotaurTouchResult(MinotaurTouchEffect.BreakSpirit,6) && MinotaurRules.ResolveTouch(5, new ScriptedRandom(3)) == new MinotaurTouchResult(MinotaurTouchEffect.DrinkFlesh,3,true) && MinotaurRules.ResolveTouch(6, new ScriptedRandom()).MemoryLost, "Every Touch of the Minotaur d6 branch must resolve with its source quantity and permanence.");
 var collisionState = local.ToState() with
 {
     RoamingHazards = [
