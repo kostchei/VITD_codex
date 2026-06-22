@@ -171,6 +171,10 @@ exploration.Descend(deeperRuin, new GridCoord(0, 0));
 Assert(exploration.Depth == 2 && exploration.Layout == deeperRuin && exploration.VisitedRooms.SetEquals([new GridCoord(0, 0)]), "A depth passage must create and enter a new Ruin layout at the next depth.");
 Assert(RuinRoomRegistry.Get(1, 1).Single().Name == "Plaza" && RuinRoomRegistry.Get(6, 6).Single().Name == "Observatory", "The Ruin room registry must resolve documented two-d6 endpoints.");
 Assert(RuinRoomRegistry.Get(4, 5).Select(room => room.Name).SequenceEqual(["Reliquary", "Fountain"]) && RuinRoomRegistry.Get(3, 2).Count == 0, "The Ruin room registry must preserve the printed duplicate 45 and the absent 32 rather than inventing an outcome.");
+Assert(RuinFeatureRules.Get(1).Single().Name == "Warning" && RuinFeatureRules.Get(31).Single().Name == "Entrance to the Deep" && RuinFeatureRules.Get(99).Single().Name == "Entrance to the Deep", "Ruin features must cover 1 through 31+ with depth-adjusted totals.");
+Assert(RuinFeatureRules.Get(25).Select(feature => feature.Name).SequenceEqual(["Vein of Metal", "Hideout"]) && RuinFeatureRules.Get(24).Count == 0, "Ruin feature data must preserve the printed duplicate 25 and missing 24.");
+var collapsedRuin = RuinCollapseService.CollapseRoom(generatedRuin, new GridCoord(0, 0));
+Assert(collapsedRuin.Rooms.All(room => room.Coordinate != new GridCoord(0, 0)) && collapsedRuin.Passages.All(passage => passage.From != new GridCoord(0, 0) && passage.To != new GridCoord(0, 0)), "An Unstable room collapse must remove the room and all its pathways.");
 var collisionState = local.ToState() with
 {
     RoamingHazards = [
