@@ -140,6 +140,13 @@ Assert(PillarDelvingRules.GetEvent(15).Name == "Call of the Dark" && PillarDelvi
 Assert(Enumerable.Range(1, 6).Select(SettlementGenerationRules.GetPopulation).Select(rule => rule.Population).SequenceEqual([SettlementPopulation.Barren, SettlementPopulation.Barren, SettlementPopulation.Barren, SettlementPopulation.Middling, SettlementPopulation.Middling, SettlementPopulation.Overcrowded]), "Settlement population d6 bands must match page 16.");
 Assert(Enumerable.Range(1, 6).Select(SettlementGenerationRules.GetScarcity).Select(rule => rule.Scarcity).SequenceEqual(Enum.GetValues<SettlementScarcity>()) && Enumerable.Range(1, 6).Select(SettlementGenerationRules.GetAtmosphere).Select(rule => rule.Atmosphere).SequenceEqual(Enum.GetValues<SettlementAtmosphere>()), "Every scarcity and atmosphere d6 face must resolve to the source table.");
 Assert(SettlementGenerationRules.Generate(new ScriptedRandom(6, 3, 5)) is { Population: { Population: SettlementPopulation.Overcrowded }, Scarcity: { Scarcity: SettlementScarcity.SteepPrices }, Atmosphere: { Atmosphere: SettlementAtmosphere.Stoic } }, "Settlement generation must independently roll population, scarcity, and atmosphere.");
+Assert(!new SettlementMarket(SettlementScarcity.Desperate).Purchase(10, 1, supplies: true, offersBarterItem: true).Purchased && !new SettlementMarket(SettlementScarcity.DifficultBargains).Purchase(10, 1, supplies: false, offersBarterItem: false).Purchased, "Desperate and difficult-bargain scarcity must enforce their purchase restrictions.");
+var limitedMarket = new SettlementMarket(SettlementScarcity.LimitedInventory, new ScriptedRandom(2));
+Assert(limitedMarket.Purchase(10, 2, supplies: false, offersBarterItem: false).Purchased && !limitedMarket.Purchase(10, 1, supplies: false, offersBarterItem: false).Purchased, "Limited inventory must share a 1d6 collective purchase budget.");
+Assert(new SettlementMarket(SettlementScarcity.SteepPrices).Purchase(10, 2, supplies: false, offersBarterItem: false).CoinCost == 40 && new SettlementMarket(SettlementScarcity.Bountiful).Purchase(10, 2, supplies: true, offersBarterItem: false).QuantityReceived == 3, "Steep Prices must double costs and Bountiful supplies must grant one extra item.");
+var storytellerTraveler = new Traveler("Storyteller");
+storytellerTraveler.AddExhaustion(1);
+Assert(SettlementRestService.TryRecoverStorytellerExhaustion(storytellerTraveler, new ScriptedRandom(1)) && storytellerTraveler.Exhaustion == 0 && !SettlementRestService.TryRecoverStorytellerExhaustion(storytellerTraveler, new ScriptedRandom(2)), "Storytellers must grant extra recovery only on a 1-in-6 result when exhaustion exists.");
 var collisionState = local.ToState() with
 {
     RoamingHazards = [
