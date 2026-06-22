@@ -18,7 +18,8 @@ public sealed record TravelerState(
     List<NamedValueState>? Skills = null,
     List<NamedValueState>? Resources = null,
     List<string>? Conditions = null,
-    AbilityScores? AbilityScores = null);
+    AbilityScores? AbilityScores = null,
+    List<ExhaustionSource>? ExhaustionSources = null);
 
 public sealed record PartyState(List<TravelerState> Members);
 

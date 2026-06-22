@@ -55,6 +55,13 @@ inventory.RecordOwnItem(new InventoryItem("Relic", 3, isUniqueOrMagical: true));
 Assert(packCost == 120 && inventory.Capacity == 12 && inventory.AvailableSlots == 7, "Packs must expand capacity and unique items must consume their own slots.");
 AssertThrows(() => inventory.AssignLoadoutAtSettlement("Defense", 1, 10, atSettlement: false), "Inventory loadouts must be restricted to settlements.");
 AssertThrows(() => inventory.DrawCommonItem("Navigation", new InventoryItem("Magic Compass", 1, isUniqueOrMagical: true)), "Unique or magical items cannot be drawn from a common-item loadout.");
+var exhaustedTraveler = new Traveler("Exhausted");
+exhaustedTraveler.AddExhaustion(1, ExhaustionSource.LostSleep);
+exhaustedTraveler.AddExhaustion(1, ExhaustionSource.SevereWound);
+exhaustedTraveler.AddExhaustion(1, ExhaustionSource.Hunger);
+exhaustedTraveler.AddExhaustion(1, ExhaustionSource.ForcedMarch);
+Assert(exhaustedTraveler.ExhaustionSources.SequenceEqual([ExhaustionSource.LostSleep, ExhaustionSource.SevereWound, ExhaustionSource.Hunger, ExhaustionSource.ForcedMarch]), "Exhaustion must retain each documented cause.");
+Assert(exhaustedTraveler.RecoverExhaustionFromFullRest() && exhaustedTraveler.Exhaustion == 3 && new Traveler(exhaustedTraveler.ToState()).ExhaustionSources.Count == 3, "A full day of rest must remove one exhaustion level and preserve remaining sources.");
 var absorbedDamage = VitalityRules.ApplyDamage(new Vitality(6, 4), 5);
 Assert(absorbedDamage.Vitality == new Vitality(1, 4) && absorbedDamage.FleshDamage == 0, "Grit must absorb damage before Flesh.");
 var fleshDamage = VitalityRules.ApplyDamage(new Vitality(2, 4), 5);
@@ -163,7 +170,7 @@ var hazardDayBeforeRest = movementCampaign.GetLocalMap(partyRegionalCoordinate).
 Assert(movementCampaign.TryRestParty().Moved && movementCampaign.PartyTravel.DailyMiles == 0 && movementCampaign.PartyTravel.Day == 2 && movementCampaign.Party.TotalRations == 0, "Rest must consume one ration, begin a new travel day, and reset daily miles.");
 Assert(movementCampaign.GetLocalMap(partyRegionalCoordinate).RoamingHazardDay == hazardDayBeforeRest + 1, "Rest must advance roaming hazards in the party's local chunk.");
 var exhaustionBeforeUnfedRest = movementCampaign.Party.TotalExhaustion;
-Assert(movementCampaign.TryRestParty().Moved && movementCampaign.Party.TotalExhaustion == exhaustionBeforeUnfedRest + 1, "Rest without a ration must add one exhaustion level.");
+Assert(movementCampaign.TryRestParty().Moved && movementCampaign.Party.TotalExhaustion == exhaustionBeforeUnfedRest, "A hungry full-day rest must add hunger exhaustion then recover one exhaustion from resting.");
 Assert(movementCampaign.TravelLog.Count >= 3 && movementCampaign.TravelLog.Last().Message.Contains("Day 3 begins", StringComparison.Ordinal), "Successful travel actions must append a persisted travel log entry.");
 
 var boundaryCampaign = new Campaign(new Random(97531));

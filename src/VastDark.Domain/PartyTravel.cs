@@ -58,7 +58,7 @@ public sealed class PartyTravelState
         ForcedMarchUsed = true;
         foreach (var traveler in party.Members)
         {
-            traveler.AddExhaustion(1);
+            traveler.AddExhaustion(1, ExhaustionSource.ForcedMarch);
         }
     }
 
@@ -73,8 +73,10 @@ public sealed class PartyTravelState
             }
             else
             {
-                traveler.AddExhaustion(1);
+                traveler.AddExhaustion(1, ExhaustionSource.Hunger);
             }
+
+            traveler.RecoverExhaustionFromFullRest();
         }
 
         Day++;

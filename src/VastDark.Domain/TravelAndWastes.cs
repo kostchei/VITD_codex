@@ -14,11 +14,14 @@ public sealed class SystemRandomSource : IRandomSource
     public int Next(int minInclusive, int maxExclusive) => _random.Next(minInclusive, maxExclusive);
 }
 
+public enum ExhaustionSource { Unspecified, LostSleep, SevereWound, Hunger, ForcedMarch }
+
 public sealed class Traveler
 {
     private readonly Dictionary<string, int> _skills = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, int> _resources = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _conditions = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<ExhaustionSource> _exhaustionSources = [];
 
     public Traveler(string name, int health = 10, int rations = 0, AbilityScores? abilityScores = null)
     {
@@ -41,7 +44,15 @@ public sealed class Traveler
             state.Rations,
             state.AbilityScores)
     {
-        AddExhaustion(state.Exhaustion);
+        if (state.ExhaustionSources is { Count: > 0 })
+        {
+            foreach (var source in state.ExhaustionSources.Take(state.Exhaustion))
+            {
+                AddExhaustion(1, source);
+            }
+        }
+
+        AddExhaustion(state.Exhaustion - Exhaustion);
         foreach (var skill in state.Skills ?? [])
         {
             SetSkill(skill.Name, skill.Value);
@@ -62,6 +73,7 @@ public sealed class Traveler
     public int Health { get; private set; }
     public int Rations { get; private set; }
     public int Exhaustion { get; private set; }
+    public IReadOnlyList<ExhaustionSource> ExhaustionSources => _exhaustionSources;
     public AbilityScores AbilityScores { get; }
     public IReadOnlyCollection<string> Conditions => _conditions;
     public IReadOnlyDictionary<string, int> Skills => _skills;
@@ -113,7 +125,7 @@ public sealed class Traveler
         Rations += amount;
     }
 
-    public void AddExhaustion(int levels)
+    public void AddExhaustion(int levels, ExhaustionSource source = ExhaustionSource.Unspecified)
     {
         if (levels < 0)
         {
@@ -121,6 +133,15 @@ public sealed class Traveler
         }
 
         Exhaustion += levels;
+        _exhaustionSources.AddRange(Enumerable.Repeat(source, levels));
+    }
+
+    public bool RecoverExhaustionFromFullRest()
+    {
+        if (Exhaustion == 0) return false;
+        Exhaustion--;
+        _exhaustionSources.RemoveAt(_exhaustionSources.Count - 1);
+        return true;
     }
 
     public void DealDamage(int amount)
@@ -165,7 +186,8 @@ public sealed class Traveler
         _skills.OrderBy(skill => skill.Key).Select(skill => new NamedValueState(skill.Key, skill.Value)).ToList(),
         _resources.OrderBy(resource => resource.Key).Select(resource => new NamedValueState(resource.Key, resource.Value)).ToList(),
         _conditions.Order().ToList(),
-        AbilityScores);
+        AbilityScores,
+        _exhaustionSources.ToList());
 }
 
 public sealed class TravelParty
@@ -431,7 +453,7 @@ public sealed class TravelService
             }
             else
             {
-                traveler.AddExhaustion(1);
+                traveler.AddExhaustion(1, ExhaustionSource.Hunger);
                 log.Add($"{traveler.Name} gains 1 exhaustion because no ration was available.");
             }
         }
@@ -442,7 +464,7 @@ public sealed class TravelService
         {
             foreach (var traveler in party.Members)
             {
-                traveler.AddExhaustion(1);
+                traveler.AddExhaustion(1, ExhaustionSource.ForcedMarch);
             }
 
             usedForcedMarchLevels++;
