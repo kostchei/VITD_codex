@@ -67,6 +67,7 @@ public sealed class PartyTravelState
         var fedTravelers = 0;
         foreach (var traveler in party.Members)
         {
+            traveler.RecoverExhaustionFromFullRest();
             if (traveler.ConsumeRation())
             {
                 fedTravelers++;
@@ -75,8 +76,6 @@ public sealed class PartyTravelState
             {
                 traveler.AddExhaustion(1, ExhaustionSource.Hunger);
             }
-
-            traveler.RecoverExhaustionFromFullRest();
         }
 
         Day++;

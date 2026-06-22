@@ -161,6 +161,8 @@ Assert(wastesResult.CombatEnemyGroup == "Raiders", "Combat steps must expose the
 Assert(wastesParty.Members[0].Conditions.Contains("Shaken"), "Wastes effects must be committed after the entry resolves.");
 
 var movementCampaign = new Campaign(new Random(76543));
+var earlyRestCampaign = new Campaign(new Random(4242));
+Assert(earlyRestCampaign.TryRestParty().Moved && earlyRestCampaign.PartyTravel.Day == 2 && earlyRestCampaign.PartyTravel.DailyMiles == 0 && earlyRestCampaign.Party.TotalExhaustion == 1, "An early rest must begin a new 18-mile day and add hunger exhaustion when no ration is consumed.");
 var partyRegionalCoordinate = movementCampaign.PartyTravel.RegionalCoordinate;
 var partyMap = movementCampaign.GetLocalMap(partyRegionalCoordinate);
 var firstStep = HexCoord.Zero.Neighbour(0);
@@ -188,7 +190,7 @@ var hazardDayBeforeRest = movementCampaign.GetLocalMap(partyRegionalCoordinate).
 Assert(movementCampaign.TryRestParty().Moved && movementCampaign.PartyTravel.DailyMiles == 0 && movementCampaign.PartyTravel.Day == 2 && movementCampaign.Party.TotalRations == 0, "Rest must consume one ration, begin a new travel day, and reset daily miles.");
 Assert(movementCampaign.GetLocalMap(partyRegionalCoordinate).RoamingHazardDay == hazardDayBeforeRest + 1, "Rest must advance roaming hazards in the party's local chunk.");
 var exhaustionBeforeUnfedRest = movementCampaign.Party.TotalExhaustion;
-Assert(movementCampaign.TryRestParty().Moved && movementCampaign.Party.TotalExhaustion == exhaustionBeforeUnfedRest, "A hungry full-day rest must add hunger exhaustion then recover one exhaustion from resting.");
+Assert(movementCampaign.TryRestParty().Moved && movementCampaign.Party.TotalExhaustion == exhaustionBeforeUnfedRest + 1, "A hungry full-day rest must recover prior exhaustion but still add one exhaustion for the missed ration.");
 Assert(movementCampaign.TravelLog.Count >= 3 && movementCampaign.TravelLog.Last().Message.Contains("Day 3 begins", StringComparison.Ordinal), "Successful travel actions must append a persisted travel log entry.");
 
 var boundaryCampaign = new Campaign(new Random(97531));
