@@ -101,6 +101,16 @@ Assert(collapse.ExhaustedTravelers.Count == 2 && collapse.TerrainReducedToWastes
 var lightning = RoamingHazardService.Resolve(5, hazardParty, new RoamingHazardContext(Terrain.Wastes, HasExposedMetal: true), new ScriptedRandom(3, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 4));
 Assert(lightning.Damage.Count == 1 && lightning.Damage[0].Amount == 60, "Exposed metal must face a 3-in-6 Void Lightning strike for 10d6 damage.");
 Assert(RoamingHazardService.Resolve(6, hazardParty, new RoamingHazardContext(Terrain.Wastes), new ScriptedRandom()).BreathSaveTravelers.Count == 2 && RoamingHazardService.Resolve(6, hazardParty, new RoamingHazardContext(Terrain.Wastes, OnSolidOrRockyGround: true), new ScriptedRandom()).BreathSaveTravelers.Count == 0, "Singing Sand must require Breath saves only on non-solid ground.");
+Assert(Enumerable.Range(2, 11).Select(WastesWeatherRules.Get).Select(rule => rule.Effect).SequenceEqual([WastesWeatherEffect.Calm, WastesWeatherEffect.Calm, WastesWeatherEffect.Calm, WastesWeatherEffect.Calm, WastesWeatherEffect.Calm, WastesWeatherEffect.DustStorm, WastesWeatherEffect.WindBlast, WastesWeatherEffect.StoneHail, WastesWeatherEffect.PillarFog, WastesWeatherEffect.GritSlide, WastesWeatherEffect.DuneWave]), "Every 2d6 Wastes weather total must match the page 12 table.");
+var weatherParty = new TravelParty([new Traveler("Weather A"), new Traveler("Weather B")]);
+var dustStorm = WastesWeatherService.Resolve(7, weatherParty, new WastesWeatherContext(), new ScriptedRandom());
+Assert(dustStorm.TravelMilesLost == 6 && dustStorm.LandmarksObscured, "Dust Storm must cost 6 miles and obscure landmarks.");
+var windBlast = WastesWeatherService.Resolve(8, weatherParty, new WastesWeatherContext(InOpen: true), new ScriptedRandom(6, 6, 6, 6, 6, 6));
+Assert(windBlast.LightsExtinguished && windBlast.Damage.All(hit => hit.Amount == 18), "Wind Blast must extinguish lights and damage exposed Travelers for 3d6.");
+Assert(WastesWeatherService.Resolve(9, weatherParty, new WastesWeatherContext(Protected: false), new ScriptedRandom()).BreathSaveTravelers.Count == 2 && WastesWeatherService.Resolve(9, weatherParty, new WastesWeatherContext(Protected: true), new ScriptedRandom()).BreathSaveTravelers.Count == 0, "Stone Hail must require Breath saves only from unprotected Travelers.");
+Assert(WastesWeatherService.Resolve(10, weatherParty, new WastesWeatherContext(), new ScriptedRandom()) is { EncounterRollModifier: 6, LandmarksObscured: true }, "Pillar Fog must add 6 to the encounter roll and obscure landmarks.");
+Assert(WastesWeatherService.Resolve(11, weatherParty, new WastesWeatherContext(), new ScriptedRandom()) is { TravelMilesLost: 6, BreathSaveTravelers: { Count: 2 } }, "Grit Slide must cost 6 miles and require Breath saves.");
+Assert(WastesWeatherService.Resolve(12, weatherParty, new WastesWeatherContext(RunFromDuneWave: true), new ScriptedRandom()).ExhaustedTravelers.Count == 2 && WastesWeatherService.Resolve(12, weatherParty, new WastesWeatherContext(RunFromDuneWave: false), new ScriptedRandom()).BuriedTravelers.Count == 2, "Dune Wave must exhaust runners or bury those who do not run.");
 var collisionState = local.ToState() with
 {
     RoamingHazards = [
