@@ -204,6 +204,12 @@ Assert(repetitionTrial.SimulacraActive && changeTrial.ChangeRotationDegrees == 1
 var emptinessTrial = new DeepTrialState(DeepTrial.Emptiness);
 Assert(!emptinessTrial.TraverseEmptiness(101, false) && emptinessTrial.TraverseEmptiness(100, false) && emptinessTrial.TraverseEmptiness(900, true) && emptinessTrial.ExitOpen, "Emptiness must require safe 100-foot slab hops or rigging and open its exit at 1000 feet.");
 Assert(!new DeepTrialState(DeepTrial.Sacrifice).ResolveSacrifice(false) && new DeepTrialState(DeepTrial.Sacrifice).ResolveSacrifice(true), "Sacrifice must keep its exit open only while a mortal remains behind.");
+var liesTrial = new DeepTrialState(DeepTrial.Lies); liesTrial.EnterLiesLight(); liesTrial.DieInFalseWorld();
+Assert(!liesTrial.InFalseWorld && liesTrial.ReawakenedInLiesRoom, "Lies must reawaken a Traveler in the trial room when they die in its false world.");
+var escapeRitual = new EscapeTheVastRitual();
+AssertThrows(() => escapeRitual.FallForward(), "Leaving the Vast must reject an incomplete ritual.");
+escapeRitual.SeekLushMendedFamiliar(); escapeRitual.SearchCannyClearBenign(); escapeRitual.HideSpotOutsideSenses(); escapeRitual.SpeakWishToLeaveTheVast();
+Assert(escapeRitual.FallForward() == VastTerminalOutcome.EscapedHome, "The complete page 37 ritual must return the Traveler home.");
 var collisionState = local.ToState() with
 {
     RoamingHazards = [
