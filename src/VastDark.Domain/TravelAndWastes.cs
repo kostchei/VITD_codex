@@ -20,7 +20,7 @@ public sealed class Traveler
     private readonly Dictionary<string, int> _resources = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _conditions = new(StringComparer.OrdinalIgnoreCase);
 
-    public Traveler(string name, int health = 10, int rations = 0)
+    public Traveler(string name, int health = 10, int rations = 0, AbilityScores? abilityScores = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         if (health < 0 || rations < 0)
@@ -31,13 +31,15 @@ public sealed class Traveler
         Name = name;
         Health = health;
         Rations = rations;
+        AbilityScores = abilityScores ?? AbilityScores.Average;
     }
 
     public Traveler(TravelerState state)
         : this(
             state?.Name ?? throw new ArgumentNullException(nameof(state)),
             state.Health,
-            state.Rations)
+            state.Rations,
+            state.AbilityScores)
     {
         AddExhaustion(state.Exhaustion);
         foreach (var skill in state.Skills ?? [])
@@ -60,9 +62,14 @@ public sealed class Traveler
     public int Health { get; private set; }
     public int Rations { get; private set; }
     public int Exhaustion { get; private set; }
+    public AbilityScores AbilityScores { get; }
     public IReadOnlyCollection<string> Conditions => _conditions;
     public IReadOnlyDictionary<string, int> Skills => _skills;
     public IReadOnlyDictionary<string, int> Resources => _resources;
+
+    public int GetAbilityScore(Ability ability) => AbilityScores[ability];
+
+    public int GetAbilityModifier(Ability ability) => AbilityScores.Modifier(ability);
 
     public void SetSkill(string skill, int value)
     {
@@ -157,7 +164,8 @@ public sealed class Traveler
         Exhaustion,
         _skills.OrderBy(skill => skill.Key).Select(skill => new NamedValueState(skill.Key, skill.Value)).ToList(),
         _resources.OrderBy(resource => resource.Key).Select(resource => new NamedValueState(resource.Key, resource.Value)).ToList(),
-        _conditions.Order().ToList());
+        _conditions.Order().ToList(),
+        AbilityScores);
 }
 
 public sealed class TravelParty

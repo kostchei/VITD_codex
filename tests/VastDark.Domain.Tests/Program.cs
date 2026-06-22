@@ -38,7 +38,11 @@ Assert(local.RoamingHazards.Values.Order().SequenceEqual(originalHazardFaces), "
 Assert(Enumerable.Range(1, 6).Select(LocalMap.GetRoamingHazardName).SequenceEqual(["Warband", "Maelstrom", "Crawlherd", "Collapse", "Void Lightning", "Singing Sand"]), "Roaming hazard names must match the full page 11 d6 table.");
 Assert(VitalityRules.StartingGrit(2, 1, [5, 7]) == 13 && VitalityRules.StartingFlesh(2, 3) == 5, "Starting Grit and Flesh must follow the page 7 formulas.");
 Assert(AbilityScoreRules.Roll3d6(new ScriptedRandom(1, 6, 3)) == 10, "DCC ability scores must roll 3d6.");
-Assert(AbilityScoreRules.Modifier(3) == -4 && AbilityScoreRules.Modifier(9) == -1 && AbilityScoreRules.Modifier(10) == 0 && AbilityScoreRules.Modifier(11) == 0 && AbilityScoreRules.Modifier(18) == 4, "DCC ability modifiers must use floor((score - 10) / 2). ");
+Assert(AbilityScoreRules.Modifier(3) == -4 && AbilityScoreRules.Modifier(9) == -1 && AbilityScoreRules.Modifier(10) == 0 && AbilityScoreRules.Modifier(11) == 0 && AbilityScoreRules.Modifier(18) == 4, "DCC ability modifiers must use floor((score - 10) / 2).");
+var scores = new AbilityScores(3, 8, 14, 10, 18, 11);
+var scoredTraveler = new Traveler("Scored", abilityScores: scores);
+Assert(scoredTraveler.GetAbilityScore(Ability.Constitution) == 14 && scoredTraveler.GetAbilityModifier(Ability.Constitution) == 2 && scores.HighestModifier == 4, "Travelers must retain score values and derive their DCC modifiers.");
+Assert(new Traveler(scoredTraveler.ToState()).AbilityScores == scores && new Traveler("Legacy").AbilityScores == AbilityScores.Average, "Traveler ability scores must persist while legacy travelers receive average scores.");
 Assert(InventoryRules.GetPack(PackType.Bindle) == new PackRule(PackType.Bindle, 2, 20) && InventoryRules.GetPack(PackType.Backpack) == new PackRule(PackType.Backpack, 10, 120), "Pack slots and costs must match page 7.");
 Assert(InventoryRules.DailyMilesWithTransport(18, CargoTransportType.Pulk, 1) == 12 && InventoryRules.DailyMilesWithTransport(18, CargoTransportType.Sleigh, 2) == 12 && InventoryRules.DailyMilesWithTransport(18, CargoTransportType.Sleigh, 3) == 18, "Cargo transport speed restrictions must match page 7 puller limits.");
 var absorbedDamage = VitalityRules.ApplyDamage(new Vitality(6, 4), 5);
