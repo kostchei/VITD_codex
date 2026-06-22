@@ -37,6 +37,8 @@ Assert(local.RoamingHazards.Keys.Distinct().Count() == originalHazardFaces.Lengt
 Assert(local.RoamingHazards.Values.Order().SequenceEqual(originalHazardFaces), "Moving hazards must preserve their face values.");
 Assert(Enumerable.Range(1, 6).Select(LocalMap.GetRoamingHazardName).SequenceEqual(["Warband", "Maelstrom", "Crawlherd", "Collapse", "Void Lightning", "Singing Sand"]), "Roaming hazard names must match the full page 11 d6 table.");
 Assert(VitalityRules.StartingGrit(2, 1, [5, 7]) == 13 && VitalityRules.StartingFlesh(2, 3) == 5, "Starting Grit and Flesh must follow the page 7 formulas.");
+Assert(InventoryRules.GetPack(PackType.Bindle) == new PackRule(PackType.Bindle, 2, 20) && InventoryRules.GetPack(PackType.Backpack) == new PackRule(PackType.Backpack, 10, 120), "Pack slots and costs must match page 7.");
+Assert(InventoryRules.DailyMilesWithTransport(18, CargoTransportType.Pulk, 1) == 12 && InventoryRules.DailyMilesWithTransport(18, CargoTransportType.Sleigh, 2) == 12 && InventoryRules.DailyMilesWithTransport(18, CargoTransportType.Sleigh, 3) == 18, "Cargo transport speed restrictions must match page 7 puller limits.");
 var absorbedDamage = VitalityRules.ApplyDamage(new Vitality(6, 4), 5);
 Assert(absorbedDamage.Vitality == new Vitality(1, 4) && absorbedDamage.FleshDamage == 0, "Grit must absorb damage before Flesh.");
 var fleshDamage = VitalityRules.ApplyDamage(new Vitality(2, 4), 5);

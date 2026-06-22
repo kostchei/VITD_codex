@@ -38,7 +38,7 @@ Content tables are data tasks: every table row must become data and must be vali
 - [ ] **R-02 - Inventory slots and loadouts** (p. 7). Model Constitution-derived slots, item slot costs, and settlement loadout assignment. Pseudocode: `require(usedSlots + item.slots <= capacity); assignLoadoutAtSettlement()`. Test capacity rejection, slot accounting, and settlement-only loadout assignment.
 - [ ] **R-03 - Exhaustion** (p. 7). Model source-tagged exhaustion and its threshold consequences. Pseudocode: `gainExhaustion(traveler, source); if thresholdReached then applyRuleEffect()`. Test each documented source and recovery path.
 - [ ] **R-04 - Grit, Flesh, injury, and healing** (p. 7). Grit/Flesh formulas and Grit-first damage are implemented and tested in `VitalityRules`; remaining work is party-state migration, injury assignment, and recovery limits. Pseudocode: `damage -> grit -> flesh -> injury; rest healsGrit; settlement healsFlesh`.
-- [ ] **R-05 - Packs and supply transport** (p. 7 / reference p. 43). Encode pack capacity and overland movement penalties. Pseudocode: `effectiveDailyMiles = baseMiles - transportPenalty`. Test each transport option and capacity change.
+- [x] **R-05 - Packs and supply transport** (p. 7 / reference p. 43). `InventoryRules` encodes Bindle/Sack/Backpack capacities and costs plus Pulk/Sleigh capacity and puller speed limits, with deterministic tests.
 - [ ] **R-06 - Harrowing and memories** (p. 8). Track five memories and the first-entry/threshold loss procedures. Pseudocode: `onHarrowingTrigger -> rollMemoryLoss -> markMemoryLost -> resolveFinalMemory`. Test all triggers, duplicate prevention, and final-memory result.
 
 ## Travel and world generation
