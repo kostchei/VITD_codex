@@ -11,6 +11,14 @@ public sealed record DamageResolution(Vitality Vitality, int GritDamage, int Fle
 
 public static class VitalityRules
 {
+    public static Vitality CreateStartingVitality(int level, AbilityScores scores, IEnumerable<int> d8Rolls)
+    {
+        ArgumentNullException.ThrowIfNull(scores);
+        return new Vitality(
+            StartingGrit(level, scores.Modifier(Ability.Constitution), d8Rolls),
+            StartingFlesh(level, scores.HighestModifier));
+    }
+
     public static int StartingGrit(int level, int constitutionBonus, IEnumerable<int> d8Rolls)
     {
         var rolls = d8Rolls?.ToArray() ?? throw new ArgumentNullException(nameof(d8Rolls));
@@ -29,7 +37,23 @@ public static class VitalityRules
         return new DamageResolution(new Vitality(vitality.Grit - gritDamage, flesh, vitality.InjuredAbility), gritDamage, fleshDamage, fleshDamage > 0);
     }
 
+    public static DamageResolution ApplyDamage(Vitality vitality, int damage, IRandomSource random)
+    {
+        ArgumentNullException.ThrowIfNull(random);
+        var resolution = ApplyDamage(vitality, damage);
+        return resolution.InjuryRequired
+            ? resolution with { Vitality = resolution.Vitality with { InjuredAbility = (Ability)random.Next(0, Enum.GetValues<Ability>().Length) } }
+            : resolution;
+    }
+
     public static Vitality RecoverGrit(Vitality vitality, int recovery) => recovery < 0 ? throw new ArgumentOutOfRangeException(nameof(recovery)) : vitality with { Grit = vitality.Grit + recovery };
+
+    public static Vitality RecoverGritAfterRest(Vitality vitality, bool fullDayOfRest, IRandomSource random)
+    {
+        ArgumentNullException.ThrowIfNull(random);
+        var dice = fullDayOfRest ? 2 : 1;
+        return RecoverGrit(vitality, Enumerable.Range(0, dice).Sum(_ => random.Next(1, 7)));
+    }
 
     public static Vitality RecoverFleshAtSettlement(Vitality vitality) => vitality with { Flesh = vitality.Flesh + 1 };
 }

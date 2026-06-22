@@ -196,6 +196,10 @@ public sealed class Campaign
     public PartyMoveResult TryRestParty()
     {
         var restResult = PartyTravel.Rest(Party);
+        foreach (var traveler in Party.Members)
+        {
+            traveler.RecoverGritAfterRest(fullDayOfRest: true, new SystemRandomSource(_random));
+        }
         var localMap = GetLocalMap(PartyTravel.RegionalCoordinate);
         localMap.AdvanceRoamingHazards(_random);
         var rationMessage = restResult.UnfedTravelers == 0

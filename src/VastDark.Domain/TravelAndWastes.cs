@@ -23,10 +23,10 @@ public sealed class Traveler
     private readonly HashSet<string> _conditions = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<ExhaustionSource> _exhaustionSources = [];
 
-    public Traveler(string name, int health = 10, int rations = 0, AbilityScores? abilityScores = null)
+    public Traveler(string name, int health = 10, int rations = 0, AbilityScores? abilityScores = null, int level = 1, Vitality? vitality = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        if (health < 0 || rations < 0)
+        if (health < 0 || rations < 0 || level < 1)
         {
             throw new ArgumentOutOfRangeException(nameof(health), "Health and rations cannot be negative.");
         }
@@ -35,6 +35,8 @@ public sealed class Traveler
         Health = health;
         Rations = rations;
         AbilityScores = abilityScores ?? AbilityScores.Average;
+        Level = level;
+        Vitality = vitality;
     }
 
     public Traveler(TravelerState state)
@@ -42,7 +44,9 @@ public sealed class Traveler
             state?.Name ?? throw new ArgumentNullException(nameof(state)),
             state.Health,
             state.Rations,
-            state.AbilityScores)
+            state.AbilityScores,
+            state.Level,
+            state.Vitality)
     {
         if (state.ExhaustionSources is { Count: > 0 })
         {
@@ -73,6 +77,8 @@ public sealed class Traveler
     public int Health { get; private set; }
     public int Rations { get; private set; }
     public int Exhaustion { get; private set; }
+    public int Level { get; }
+    public Vitality? Vitality { get; private set; }
     public IReadOnlyList<ExhaustionSource> ExhaustionSources => _exhaustionSources;
     public AbilityScores AbilityScores { get; }
     public IReadOnlyCollection<string> Conditions => _conditions;
@@ -82,6 +88,9 @@ public sealed class Traveler
     public int GetAbilityScore(Ability ability) => AbilityScores[ability];
 
     public int GetAbilityModifier(Ability ability) => AbilityScores.Modifier(ability);
+
+    public static Traveler CreateWithVitality(string name, AbilityScores scores, int level, IEnumerable<int> d8Rolls, int rations = 0) =>
+        new(name, rations: rations, abilityScores: scores, level: level, vitality: VitalityRules.CreateStartingVitality(level, scores, d8Rolls));
 
     public void SetSkill(string skill, int value)
     {
@@ -154,6 +163,30 @@ public sealed class Traveler
         Health = Math.Max(0, Health - amount);
     }
 
+    public DamageResolution? TakeDamage(int amount, IRandomSource random)
+    {
+        if (Vitality is null)
+        {
+            DealDamage(amount);
+            return null;
+        }
+
+        var resolution = VitalityRules.ApplyDamage(Vitality, amount, random);
+        Vitality = resolution.Vitality;
+        if (resolution.InjuryRequired) AddExhaustion(1, ExhaustionSource.SevereWound);
+        return resolution;
+    }
+
+    public void RecoverGritAfterRest(bool fullDayOfRest, IRandomSource random)
+    {
+        if (Vitality is not null) Vitality = VitalityRules.RecoverGritAfterRest(Vitality, fullDayOfRest, random);
+    }
+
+    public void RecoverFleshAtSettlement()
+    {
+        if (Vitality is not null) Vitality = VitalityRules.RecoverFleshAtSettlement(Vitality);
+    }
+
     public bool TryLoseResource(string resource, int amount)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(resource);
@@ -187,7 +220,9 @@ public sealed class Traveler
         _resources.OrderBy(resource => resource.Key).Select(resource => new NamedValueState(resource.Key, resource.Value)).ToList(),
         _conditions.Order().ToList(),
         AbilityScores,
-        _exhaustionSources.ToList());
+        _exhaustionSources.ToList(),
+        Level,
+        Vitality);
 }
 
 public sealed class TravelParty
@@ -357,7 +392,7 @@ public sealed record DamageEffect(int Amount) : ITravelEffect
     {
         foreach (var traveler in context.Party.Members)
         {
-            traveler.DealDamage(Amount);
+            traveler.TakeDamage(Amount, context.Random);
         }
 
         context.Log.Add($"Party takes {Amount} damage.");
