@@ -195,6 +195,15 @@ Assert(MinotaurRules.StatBlock == new MinotaurRule(20, "Cannot be harmed", "Half
 var minotaur = new MinotaurPursuit();
 Assert(!minotaur.EnterDeepArea(new ScriptedRandom(2)) && minotaur.EnterDeepArea(new ScriptedRandom(1)) && minotaur.HasArrived, "The Minotaur must arrive on a 1-in-6 check when entering a Deep room or area and persist afterward.");
 Assert(MinotaurRules.ResolveTouch(1, new ScriptedRandom(6)) == new MinotaurTouchResult(MinotaurTouchEffect.WitherTools, 6) && MinotaurRules.ResolveTouch(2, new ScriptedRandom(6,6,6)) == new MinotaurTouchResult(MinotaurTouchEffect.ErodeBody,18) && MinotaurRules.ResolveTouch(4, new ScriptedRandom(6)) == new MinotaurTouchResult(MinotaurTouchEffect.BreakSpirit,6) && MinotaurRules.ResolveTouch(5, new ScriptedRandom(3)) == new MinotaurTouchResult(MinotaurTouchEffect.DrinkFlesh,3,true) && MinotaurRules.ResolveTouch(6, new ScriptedRandom()).MemoryLost, "Every Touch of the Minotaur d6 branch must resolve with its source quantity and permanence.");
+Assert(Enum.GetValues<DeepTrial>().Select(DeepTrialRules.Get).All(rule => !string.IsNullOrWhiteSpace(rule.Danger) && !string.IsNullOrWhiteSpace(rule.WayOut)), "Every pages 34-35 Deep trial must retain its danger and exit procedure.");
+var scaleTrial = new DeepTrialState(DeepTrial.Scale); scaleTrial.EnterUnexploredScaleRoom(); scaleTrial.EnterUnexploredScaleRoom();
+Assert(scaleTrial.ScaleReturnDistance == 4 && !scaleTrial.ReturnToScaleOrigin(3) && scaleTrial.ReturnToScaleOrigin(4), "Scale must double backtrack distance for each unexplored room and exit at the original entry.");
+var repetitionTrial = new DeepTrialState(DeepTrial.Repetition); repetitionTrial.EnterReflectionRoom();
+var changeTrial = new DeepTrialState(DeepTrial.Change); changeTrial.EnterChangeRoom(); changeTrial.EnterChangeRoom();
+Assert(repetitionTrial.SimulacraActive && changeTrial.ChangeRotationDegrees == 180 && changeTrial.ReachChangeCenter(true), "Repetition reflection rooms must activate Simulacra and Change must rotate 90 degrees per entry until the center exit.");
+var emptinessTrial = new DeepTrialState(DeepTrial.Emptiness);
+Assert(!emptinessTrial.TraverseEmptiness(101, false) && emptinessTrial.TraverseEmptiness(100, false) && emptinessTrial.TraverseEmptiness(900, true) && emptinessTrial.ExitOpen, "Emptiness must require safe 100-foot slab hops or rigging and open its exit at 1000 feet.");
+Assert(!new DeepTrialState(DeepTrial.Sacrifice).ResolveSacrifice(false) && new DeepTrialState(DeepTrial.Sacrifice).ResolveSacrifice(true), "Sacrifice must keep its exit open only while a mortal remains behind.");
 var collisionState = local.ToState() with
 {
     RoamingHazards = [
