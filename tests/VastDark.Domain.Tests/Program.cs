@@ -42,6 +42,9 @@ var vitalityTraveler = Traveler.CreateWithVitality("Vital", vitalityScores, leve
 Assert(vitalityTraveler.Vitality == new Vitality(14, 6), "Traveler vitality must derive Grit from Constitution and Flesh from the highest ability modifier.");
 Assert(AbilityScoreRules.Roll3d6(new ScriptedRandom(1, 6, 3)) == 10, "DCC ability scores must roll 3d6.");
 Assert(AbilityScoreRules.Modifier(3) == -4 && AbilityScoreRules.Modifier(9) == -1 && AbilityScoreRules.Modifier(10) == 0 && AbilityScoreRules.Modifier(11) == 0 && AbilityScoreRules.Modifier(18) == 4, "DCC ability modifiers must use floor((score - 10) / 2).");
+var travelerQuirks = Enumerable.Range(1, 20).Select(TravelerQuirkRules.Get).ToArray();
+Assert(travelerQuirks.Select(quirk => quirk.Name).Distinct().Count() == 20 && travelerQuirks.All(quirk => !string.IsNullOrWhiteSpace(quirk.RuleText)), "Every Traveler quirk d20 face must resolve to a distinct documented rule.");
+Assert(TravelerQuirkRules.Get(1).CanBeTakenMultipleTimes && TravelerQuirkRules.Roll(new ScriptedRandom(15)).Name == "Long-walker", "Ruin Plucker must be repeatable and quirk rolling must use d20 faces.");
 var scores = new AbilityScores(3, 8, 14, 10, 18, 11);
 var scoredTraveler = new Traveler("Scored", abilityScores: scores);
 Assert(scoredTraveler.GetAbilityScore(Ability.Constitution) == 14 && scoredTraveler.GetAbilityModifier(Ability.Constitution) == 2 && scores.HighestModifier == 4, "Travelers must retain score values and derive their DCC modifiers.");
