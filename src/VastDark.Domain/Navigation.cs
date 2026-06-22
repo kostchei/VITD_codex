@@ -193,10 +193,12 @@ public sealed class Campaign
     public PartyMoveResult TryRestParty()
     {
         var restResult = PartyTravel.Rest(Party);
+        var localMap = GetLocalMap(PartyTravel.RegionalCoordinate);
+        localMap.AdvanceRoamingHazards(_random);
         var rationMessage = restResult.UnfedTravelers == 0
             ? $"The party rests and consumes {restResult.FedTravelers} ration(s)."
             : $"The party rests: {restResult.FedTravelers} ration(s) consumed; {restResult.UnfedTravelers} member(s) gain 1 exhaustion from hunger.";
-        return MoveSucceeded($"{rationMessage} Day {PartyTravel.Day} begins with 18 miles available.");
+        return MoveSucceeded($"{rationMessage} Roaming hazards advance to local day {localMap.RoamingHazardDay}. Day {PartyTravel.Day} begins with 18 miles available.");
     }
 
     private PartyMoveResult MoveFailed(string message) => new(

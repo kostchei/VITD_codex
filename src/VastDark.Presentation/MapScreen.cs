@@ -16,7 +16,6 @@ public partial class MapScreen : Control
     private readonly Button _regionalButton = new() { Text = "Regional" };
     private readonly Button _localButton = new() { Text = "Local" };
     private readonly Button _dungeonButton = new() { Text = "Dungeon" };
-    private readonly Button _advanceHazardsButton = new() { Text = "Advance hazards" };
     private readonly Button _movePartyButton = new() { Text = "Move party here" };
     private readonly Button _forcedMarchButton = new() { Text = "Forced march (+6 miles)" };
     private readonly Button _restButton = new() { Text = "Rest" };
@@ -56,7 +55,6 @@ public partial class MapScreen : Control
         header.AddChild(_regionalButton);
         header.AddChild(_localButton);
         header.AddChild(_dungeonButton);
-        header.AddChild(_advanceHazardsButton);
         header.AddChild(_campaignMenu);
 
         _locationLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
@@ -136,7 +134,6 @@ public partial class MapScreen : Control
         _regionalButton.Pressed += ShowRegional;
         _localButton.Pressed += ShowLocal;
         _dungeonButton.Pressed += ShowDungeon;
-        _advanceHazardsButton.Pressed += AdvanceRoamingHazards;
         _movePartyButton.Pressed += MovePartyToSelectedHex;
         _forcedMarchButton.Pressed += BeginForcedMarch;
         _restButton.Pressed += RestParty;
@@ -185,20 +182,6 @@ public partial class MapScreen : Control
             _navigation.SetDungeonDepth(depth);
             RefreshUi();
         }
-    }
-
-    private void AdvanceRoamingHazards()
-    {
-        if (_navigation.Current is not MapLocation.Local local)
-        {
-            return;
-        }
-
-        var map = _navigation.Campaign.GetLocalMap(local.RegionalCoordinate);
-        map.AdvanceRoamingHazards();
-        CampaignFile.Save(_navigation.Campaign, _campaignPath);
-        _inspector.Text = $"Roaming hazards advanced to day {map.RoamingHazardDay}.";
-        RefreshUi();
     }
 
     private void MovePartyToSelectedHex()
@@ -278,7 +261,6 @@ public partial class MapScreen : Control
         _localButton.Disabled = current is MapLocation.Local;
         _dungeonButton.Disabled = current is not MapLocation.Local currentLocal ||
                                   !_navigation.Campaign.HasDungeonEntrance(currentLocal.RegionalCoordinate);
-        _advanceHazardsButton.Disabled = current is not MapLocation.Local;
         var partyTravel = _navigation.Campaign.PartyTravel;
         var viewingPartyLocalMap = current is MapLocation.Local partyLocal && partyLocal.RegionalCoordinate == partyTravel.RegionalCoordinate;
         _movePartyButton.Disabled = !viewingPartyLocalMap || _mapCanvas?.SelectedLocalCoordinate is null || partyTravel.RestRequired;
