@@ -169,6 +169,8 @@ Assert(exploration.ElapsedMinutes == 50 && exploration.SearchedRooms.Contains(ex
 var deeperRuin = RuinGenerationRules.Generate([1, 1, 1, 1, 1]);
 exploration.Descend(deeperRuin, new GridCoord(0, 0));
 Assert(exploration.Depth == 2 && exploration.Layout == deeperRuin && exploration.VisitedRooms.SetEquals([new GridCoord(0, 0)]), "A depth passage must create and enter a new Ruin layout at the next depth.");
+Assert(RuinRoomRegistry.Get(1, 1).Single().Name == "Plaza" && RuinRoomRegistry.Get(6, 6).Single().Name == "Observatory", "The Ruin room registry must resolve documented two-d6 endpoints.");
+Assert(RuinRoomRegistry.Get(4, 5).Select(room => room.Name).SequenceEqual(["Reliquary", "Fountain"]) && RuinRoomRegistry.Get(3, 2).Count == 0, "The Ruin room registry must preserve the printed duplicate 45 and the absent 32 rather than inventing an outcome.");
 var collisionState = local.ToState() with
 {
     RoamingHazards = [
