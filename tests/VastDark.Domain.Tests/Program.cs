@@ -111,6 +111,9 @@ Assert(WastesWeatherService.Resolve(9, weatherParty, new WastesWeatherContext(Pr
 Assert(WastesWeatherService.Resolve(10, weatherParty, new WastesWeatherContext(), new ScriptedRandom()) is { EncounterRollModifier: 6, LandmarksObscured: true }, "Pillar Fog must add 6 to the encounter roll and obscure landmarks.");
 Assert(WastesWeatherService.Resolve(11, weatherParty, new WastesWeatherContext(), new ScriptedRandom()) is { TravelMilesLost: 6, BreathSaveTravelers: { Count: 2 } }, "Grit Slide must cost 6 miles and require Breath saves.");
 Assert(WastesWeatherService.Resolve(12, weatherParty, new WastesWeatherContext(RunFromDuneWave: true), new ScriptedRandom()).ExhaustedTravelers.Count == 2 && WastesWeatherService.Resolve(12, weatherParty, new WastesWeatherContext(RunFromDuneWave: false), new ScriptedRandom()).BuriedTravelers.Count == 2, "Dune Wave must exhaust runners or bury those who do not run.");
+Assert(Enumerable.Range(1, 18).Select(WastesEncounterRules.GetEncounter).All(rule => !string.IsNullOrWhiteSpace(rule.Name)) && WastesEncounterRules.GetEncounter(7).RequiresMood && WastesEncounterRules.GetEncounter(13).RequiresMood, "Every Wastes encounter total must resolve and the three source mood encounters must require a mood roll.");
+Assert(WastesEncounterRules.GetMood("Nomads", 1).Name == "Cautious" && WastesEncounterRules.GetMood("Nomads", 6).Name == "Friendly" && WastesEncounterRules.GetMood("Bandits", 3).Name == "Tribute" && WastesEncounterRules.GetMood("Cutthroats", 6).Name == "Recruit", "Wastes mood bands must match the source d6 tables.");
+Assert(Enumerable.Range(1, 20).Select(WastesEncounterRules.GetCuriosity).Select(curiosity => curiosity.Name).Distinct().Count() == 20 && WastesEncounterRules.GetCuriosity(11).Description.Contains("landmark", StringComparison.OrdinalIgnoreCase), "Every Wastes curiosity d20 face must resolve to unique source content.");
 var collisionState = local.ToState() with
 {
     RoamingHazards = [
