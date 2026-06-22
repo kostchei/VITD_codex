@@ -61,6 +61,8 @@ public sealed class Traveler
     public int Rations { get; private set; }
     public int Exhaustion { get; private set; }
     public IReadOnlyCollection<string> Conditions => _conditions;
+    public IReadOnlyDictionary<string, int> Skills => _skills;
+    public IReadOnlyDictionary<string, int> Resources => _resources;
 
     public void SetSkill(string skill, int value)
     {

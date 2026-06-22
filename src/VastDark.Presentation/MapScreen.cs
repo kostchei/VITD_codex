@@ -11,6 +11,7 @@ public partial class MapScreen : Control
     private readonly Label _locationLabel = new();
     private readonly Label _travelLabel = new();
     private readonly Label _inspector = new();
+    private readonly Label _partyDetails = new();
     private readonly Label _travelLog = new();
     private readonly Button _regionalButton = new() { Text = "Regional" };
     private readonly Button _localButton = new() { Text = "Local" };
@@ -118,6 +119,12 @@ public partial class MapScreen : Control
         _inspector.AddThemeConstantOverride("margin_top", 12);
         inspectorPanel.AddChild(_inspector);
         sidebar.AddChild(inspectorPanel);
+
+        var partyTitle = new Label { Text = "Party status" };
+        partyTitle.AddThemeFontSizeOverride("font_size", 16);
+        sidebar.AddChild(partyTitle);
+        _partyDetails.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        sidebar.AddChild(_partyDetails);
 
         var logTitle = new Label { Text = "Recent travel" };
         logTitle.AddThemeFontSizeOverride("font_size", 16);
@@ -292,6 +299,14 @@ public partial class MapScreen : Control
         };
         var party = _navigation.Campaign.Party;
         _travelLabel.Text = $"Party: {partyTravel.LocalCoordinate} in {partyTravel.RegionalCoordinate} | Day {partyTravel.Day} | {partyTravel.DailyMiles} / {partyTravel.DailyMileLimit} miles | Rations {party.TotalRations} | Exhaustion {party.TotalExhaustion}";
+        _partyDetails.Text = string.Join("\n\n", party.Members.Select(member =>
+        {
+            var conditions = member.Conditions.Count == 0 ? "none" : string.Join(", ", member.Conditions.Order());
+            var resources = member.Resources.Count == 0
+                ? "none"
+                : string.Join(", ", member.Resources.Where(resource => resource.Value > 0).OrderBy(resource => resource.Key).Select(resource => $"{resource.Key} {resource.Value}"));
+            return $"{member.Name}: HP {member.Health} | Rations {member.Rations} | Exhaustion {member.Exhaustion}\nConditions: {conditions}\nResources: {resources}";
+        }));
         _travelLog.Text = _navigation.Campaign.TravelLog.Count == 0
             ? "No travel recorded yet."
             : string.Join("\n", _navigation.Campaign.TravelLog.TakeLast(6).Select(entry => $"Day {entry.Day}: {entry.Message}"));
