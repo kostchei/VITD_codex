@@ -147,6 +147,9 @@ Assert(new SettlementMarket(SettlementScarcity.SteepPrices).Purchase(10, 2, supp
 var storytellerTraveler = new Traveler("Storyteller");
 storytellerTraveler.AddExhaustion(1);
 Assert(SettlementRestService.TryRecoverStorytellerExhaustion(storytellerTraveler, new ScriptedRandom(1)) && storytellerTraveler.Exhaustion == 0 && !SettlementRestService.TryRecoverStorytellerExhaustion(storytellerTraveler, new ScriptedRandom(2)), "Storytellers must grant extra recovery only on a 1-in-6 result when exhaustion exists.");
+Assert(Enumerable.Range(1, 12).Select(SettlementServiceRules.Get).Select(location => location.Location).Distinct().Count() == 12 && SettlementServiceRules.Get(3).Services.Count == 5, "Every page 17 settlement location and its documented services must resolve.");
+Assert(SettlementServiceRules.LodestoneCarverCoins(3) == 300 && SettlementServiceRules.ResolveRemedy(false, new ScriptedRandom(6)).Effect == "Recover 6 Grit." && SettlementServiceRules.ResolveRemedy(true, new ScriptedRandom(3)).Effect == "Recover 3 Flesh.", "Lodestone Carver value and Apothecary Remedy recovery must match the source.");
+Assert(SettlementServiceRules.ResolveMalady(new ScriptedRandom(1)).Effect == "Blinded." && SettlementServiceRules.ResolveMalady(new ScriptedRandom(2)).Effect == "2d6 damage." && SettlementServiceRules.ResolveMalady(new ScriptedRandom(3)).Effect == "Paralysis for 1 hour.", "Apothecary Malady must resolve all three documented contact outcomes.");
 var collisionState = local.ToState() with
 {
     RoamingHazards = [

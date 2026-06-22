@@ -65,7 +65,7 @@ Content tables are data tasks: every table row must become data and must be vali
 
 - [x] **R-20 - Settlement generation** (p. 16). Encoded all population bands with location/faction dice, scarcity outcomes, and six atmosphere outcomes. Pseudocode: `settlement = roll(population, scarcity, atmosphere)`. Tests cover all d6 results and deterministic generation.
 - [x] **R-21 - Settlement rest, purchase, and resupply rules** (pp. 16-17). Implemented scarcity-adjusted purchases: sell-only, shared 1d6 inventory, doubled prices, barter gate, normal market, and a free additional supply. Storyteller rest gets its source-defined 1-in-6 extra exhaustion recovery. Pseudocode: `purchase -> validateScarcity -> consumeSharedStock -> grantItems; rest -> storytellerRecovery`. Tests cover all purchase/recovery modifiers.
-- [ ] **R-22 - Settlement services** (p. 17). Encode stories, repair, renew, medicine, hellfire, scrolls, companions, and barter. Pseudocode: `resolveService(service, cost, prerequisites)`. Test every service cost and result.
+- [x] **R-22 - Settlement services** (p. 17). Encoded all twelve locations and every stated service, barter/material prerequisite, timed benefit, and numeric result. Lodestone Carver exchange plus Remedy/Malady branches are executable; services without a source-stated price remain explicit trade decisions. Pseudocode: `resolveService(service, tradePrerequisites) -> result`. Tests verify all locations and defined numeric branches.
 - [ ] **R-23 - Denizens and settlement factions** (pp. 18-19). Encode their triggers, offers, obligations, and once-per-day abilities. Pseudocode: `interact(entity, choice) -> consequence`. Test acceptance/refusal and daily limits.
 
 ## Ruins and the Deep
