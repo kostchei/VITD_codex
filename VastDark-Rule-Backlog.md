@@ -63,7 +63,7 @@ Content tables are data tasks: every table row must become data and must be vali
 
 ## Settlements and social systems
 
-- [ ] **R-20 - Settlement generation** (p. 16). Encode population, scarcity, and atmosphere tables. Pseudocode: `settlement = roll(population, scarcity, atmosphere)`. Test every d6 result and settlement state.
+- [x] **R-20 - Settlement generation** (p. 16). Encoded all population bands with location/faction dice, scarcity outcomes, and six atmosphere outcomes. Pseudocode: `settlement = roll(population, scarcity, atmosphere)`. Tests cover all d6 results and deterministic generation.
 - [ ] **R-21 - Settlement rest, purchase, and resupply rules** (pp. 16-17). Implement scarcity-adjusted purchases, rest/recovery, and limited/bountiful inventory. Pseudocode: `purchase -> validateScarcity -> applyInventory; restAtSettlement -> recover`. Test price/availability modifiers and recovery.
 - [ ] **R-22 - Settlement services** (p. 17). Encode stories, repair, renew, medicine, hellfire, scrolls, companions, and barter. Pseudocode: `resolveService(service, cost, prerequisites)`. Test every service cost and result.
 - [ ] **R-23 - Denizens and settlement factions** (pp. 18-19). Encode their triggers, offers, obligations, and once-per-day abilities. Pseudocode: `interact(entity, choice) -> consequence`. Test acceptance/refusal and daily limits.
