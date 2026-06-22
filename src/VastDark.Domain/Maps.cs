@@ -349,11 +349,11 @@ public sealed class LocalMap
         return dieRoll switch
         {
             1 => "Warband",
-            2 => "Healing Columns",
-            3 => "Collapse",
-            4 => "Void Lightning",
-            5 => "Singing Sand",
-            6 => "Souls",
+            2 => "Maelstrom",
+            3 => "Crawlherd",
+            4 => "Collapse",
+            5 => "Void Lightning",
+            6 => "Singing Sand",
             _ => throw new InvalidOperationException(),
         };
     }

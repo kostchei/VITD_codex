@@ -35,7 +35,17 @@ Assert(local.RoamingHazardDay == 1, "Advancing hazards must increment the local 
 Assert(local.RoamingHazards.Count == originalHazardFaces.Length, "Advancing hazards must preserve the number of hazards.");
 Assert(local.RoamingHazards.Keys.Distinct().Count() == originalHazardFaces.Length, "Roaming hazards must occupy distinct cells after moving.");
 Assert(local.RoamingHazards.Values.Order().SequenceEqual(originalHazardFaces), "Moving hazards must preserve their face values.");
-Assert(LocalMap.GetRoamingHazardName(4) == "Void Lightning", "Hazard names must match their d6 result.");
+Assert(Enumerable.Range(1, 6).Select(LocalMap.GetRoamingHazardName).SequenceEqual(["Warband", "Maelstrom", "Crawlherd", "Collapse", "Void Lightning", "Singing Sand"]), "Roaming hazard names must match the full page 11 d6 table.");
+var collisionState = local.ToState() with
+{
+    RoamingHazards = [
+        new RoamingHazardState(HexCoord.Zero.Q, HexCoord.Zero.R, 1),
+        new RoamingHazardState(HexCoord.Zero.Neighbour(0).Q, HexCoord.Zero.Neighbour(0).R, 2),
+    ],
+};
+var collisionMap = new LocalMap(collisionState);
+collisionMap.AdvanceRoamingHazards(new ScriptedSystemRandom(0, 0, 0));
+Assert(collisionMap.RoamingHazards.Count == 2 && collisionMap.RoamingHazards.Keys.Distinct().Count() == 2, "A roaming-hazard collision must re-drop rather than merge hazards.");
 
 var noAssetNavigation = DailyNavigationService.Resolve([], new ScriptedRandom(1));
 Assert(noAssetNavigation.IsLost && noAssetNavigation.Effect == LostEffect.UtterlyLost && noAssetNavigation.RequiresRepeatedNavigation, "A roll of 1 without navigation assets must leave the party utterly lost.");
@@ -303,6 +313,29 @@ sealed class ScriptedRandom(params int[] values) : IRandomSource
         if (value < minInclusive || value >= maxExclusive)
         {
             throw new InvalidOperationException($"Scripted random value {value} is outside [{minInclusive}, {maxExclusive}).");
+        }
+
+        return value;
+    }
+}
+
+sealed class ScriptedSystemRandom(params int[] values) : Random
+{
+    private readonly Queue<int> _values = new(values);
+
+    public override int Next(int maxValue) => Next(0, maxValue);
+
+    public override int Next(int minValue, int maxValue)
+    {
+        if (_values.Count == 0)
+        {
+            throw new InvalidOperationException("The test did not provide a scripted random value.");
+        }
+
+        var value = _values.Dequeue();
+        if (value < minValue || value >= maxValue)
+        {
+            throw new InvalidOperationException($"Scripted random value {value} is outside [{minValue}, {maxValue}).");
         }
 
         return value;

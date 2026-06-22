@@ -50,7 +50,7 @@ Content tables are data tasks: every table row must become data and must be vali
 
 ## Hazards, Wastes, and Pillars
 
-- [ ] **R-11 - Roaming-hazard movement** (p. 11). Advance every active local hazard once per completed travel day, rerolling/re-dropping collisions and exits. Pseudocode: `for hazard: direction=d6; moveOrRedrop(hazard)`. Test collision, map exit, face preservation, and day advancement.
+- [x] **R-11 - Roaming-hazard movement** (p. 11). Corrected the d6 table to Warband/Maelstrom/Crawlherd/Collapse/Void Lightning/Singing Sand. Existing daily movement, exit re-drop, face preservation, and rest advancement are now supplemented by a deterministic collision re-drop test.
 - [ ] **R-12 - Roaming-hazard resolution** (p. 11). Encode all six hazard outcomes and their saves, damage, resource, and encounter consequences. Pseudocode: `onEnterHazard -> resolveHazardTable(d6)`. Test all six faces with scripted saves.
 - [ ] **R-13 - Wastes weather table** (p. 12). Encode 2d6 weather, travel loss, saves, damage, exhaustion, and equipment protection. Pseudocode: `weather = roll2d6(); applyWeather(weather, party)`. Test totals 2-12 and protective exceptions.
 - [ ] **R-14 - Wastes encounter, mood, and curiosity tables** (p. 12). Encode 1d12 encounter + 1d6 mood and 1d20 curiosity data. Pseudocode: `encounter = table[d12]; mood = table[d6]; curiosity = optionalTable[d20]`. Test every range and mood branch.
