@@ -228,6 +228,10 @@ var dailyUses = new DailyUseTracker();
 Assert(dailyUses.TryUse("Spell Eater") && !dailyUses.TryUse("spell eater") && dailyUses.TryUse("Oracle Skull"), "Explicit once-per-day source effects must be independently gated by normalized effect identity.");
 dailyUses.ResetDay();
 Assert(dailyUses.TryUse("Spell Eater"), "Daily-use gates must reset on a new day.");
+var terrainDayParty = new TravelParty([new Traveler("Terrain Day")]);
+var wastesDay = TerrainDayEventService.ResolveDay(Terrain.Wastes, terrainDayParty, new ScriptedRandom(6, 6, 12));
+Assert(wastesDay.Weather is { Rule.Effect: WastesWeatherEffect.DuneWave } && wastesDay.Encounter?.Name == "Caravan" && terrainDayParty.TotalExhaustion == 1, "A Wastes day must resolve its 2d6 weather effects and weather-modified encounter at the day checkpoint.");
+Assert(TerrainDayEventService.ResolveDay(Terrain.Pillars, terrainDayParty, new ScriptedRandom()) is { Weather: null, Encounter: null }, "Pillar daily checkpoints must not invent a weather/encounter procedure absent from the source.");
 var collisionState = local.ToState() with
 {
     RoamingHazards = [

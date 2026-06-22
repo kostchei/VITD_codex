@@ -195,17 +195,19 @@ public sealed class Campaign
 
     public PartyMoveResult TryRestParty()
     {
+        var localMap = GetLocalMap(PartyTravel.RegionalCoordinate);
+        var terrainEvent = TerrainDayEventService.ResolveDay(localMap.GetTerrain(PartyTravel.LocalCoordinate), Party, new SystemRandomSource(_random));
         var restResult = PartyTravel.Rest(Party);
         foreach (var traveler in Party.Members)
         {
             traveler.RecoverGritAfterRest(fullDayOfRest: true, new SystemRandomSource(_random));
         }
-        var localMap = GetLocalMap(PartyTravel.RegionalCoordinate);
         localMap.AdvanceRoamingHazards(_random);
         var rationMessage = restResult.UnfedTravelers == 0
             ? $"The party rests and consumes {restResult.FedTravelers} ration(s)."
             : $"The party rests: {restResult.FedTravelers} ration(s) consumed; {restResult.UnfedTravelers} member(s) gain 1 exhaustion from hunger.";
-        return MoveSucceeded($"{rationMessage} Roaming hazards advance to local day {localMap.RoamingHazardDay}. Day {PartyTravel.Day} begins with 18 miles available.");
+        var terrainMessage = terrainEvent.Weather is null ? string.Empty : $" Wastes day: {terrainEvent.Weather.Rule.Name}; encounter: {terrainEvent.Encounter!.Name}.";
+        return MoveSucceeded($"{rationMessage} Roaming hazards advance to local day {localMap.RoamingHazardDay}.{terrainMessage} Day {PartyTravel.Day} begins with 18 miles available.");
     }
 
     private PartyMoveResult MoveFailed(string message) => new(
