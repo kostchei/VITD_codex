@@ -49,6 +49,7 @@ public partial class MapCanvas : Control
     public event Action<string>? CellSelected;
 
     public LocalMapCoord? SelectedLocalCoordinate => _selectedLocal;
+    public GridCoord? SelectedRuinRoom => _selectedGrid;
 
     public void SetNavigation(MapNavigationService navigation)
     {
@@ -114,7 +115,7 @@ public partial class MapCanvas : Control
                 DrawLocalArea(local.RegionalCoordinate);
                 break;
             case MapLocation.Dungeon dungeon:
-                DrawDungeonMap(_navigation.Campaign.Dungeon.GetLevel(dungeon.Depth));
+                DrawRuinMap(_navigation.Campaign.Ruin);
                 break;
         }
     }
@@ -225,6 +226,25 @@ public partial class MapCanvas : Control
                     DrawRect(rectangle.Grow(2f), Selection, false, 3f);
                 }
             }
+        }
+    }
+
+    private void DrawRuinMap(RuinExploration ruin)
+    {
+        var rooms = ruin.Layout.Rooms.ToDictionary(room => room.Coordinate, room => new Vector2(room.Coordinate.X * 120f, room.Coordinate.Y * 100f));
+        foreach (var passage in ruin.Layout.Passages)
+        {
+            DrawLine(ToScreen(rooms[passage.From]), ToScreen(rooms[passage.To]), RegionalOutline, 3f * _zoom);
+        }
+        foreach (var room in ruin.Layout.Rooms)
+        {
+            var centre = ToScreen(rooms[room.Coordinate]);
+            var visited = ruin.VisitedRooms.Contains(room.Coordinate);
+            var color = room.Coordinate == ruin.CurrentRoom ? new Color("d97735") : visited ? new Color("67c5b9") : RuinsFill;
+            DrawCircle(centre, 24f * _zoom, color);
+            DrawArc(centre, 24f * _zoom, 0, Mathf.Tau, 24, GridLine, 2f * _zoom);
+            DrawString(ThemeDB.FallbackFont, centre + new Vector2(-8, 6) * _zoom, room.SourceFaceIndex.ToString(), HorizontalAlignment.Center, 16 * _zoom, (int)(14 * _zoom), SymbolLine);
+            if (_selectedGrid == room.Coordinate) DrawArc(centre, 29f * _zoom, 0, Mathf.Tau, 24, Selection, 3f);
         }
     }
 
@@ -432,7 +452,7 @@ public partial class MapCanvas : Control
                 SelectLocal(screenPosition, local.RegionalCoordinate);
                 break;
             case MapLocation.Dungeon dungeon:
-                SelectDungeon(screenPosition, _navigation.Campaign.Dungeon.GetLevel(dungeon.Depth));
+                SelectRuin(screenPosition, _navigation.Campaign.Ruin);
                 break;
         }
 
@@ -501,6 +521,18 @@ public partial class MapCanvas : Control
         CellSelected?.Invoke($"Dungeon depth {level.Depth}, grid cell {coordinate}\n\nTile: {level.GetTile(coordinate)}");
     }
 
+    private void SelectRuin(Vector2 screenPosition, RuinExploration ruin)
+    {
+        var selected = ruin.Layout.Rooms
+            .Select(room => (Room: room, Position: ToScreen(new Vector2(room.Coordinate.X * 120f, room.Coordinate.Y * 100f))))
+            .Where(candidate => candidate.Position.DistanceTo(screenPosition) <= 28f * _zoom)
+            .OrderBy(candidate => candidate.Position.DistanceTo(screenPosition))
+            .FirstOrDefault();
+        if (selected.Room is null) return;
+        _selectedGrid = selected.Room.Coordinate;
+        CellSelected?.Invoke($"Ruin depth {ruin.Depth}, room {selected.Room.Coordinate}\n\n{(ruin.VisitedRooms.Contains(selected.Room.Coordinate) ? "Visited" : "Unexplored")}\nSelect Move in the panel to traverse a connected passage.");
+    }
+
     private void ZoomAround(Vector2 screenPosition, float factor)
     {
         var anchor = ToWorld(screenPosition);
@@ -513,9 +545,7 @@ public partial class MapCanvas : Control
     {
         MapLocation.Regional => RegionalCentre(new RegionalCoord(RegionalMap.Width / 2, RegionalMap.Height / 2)),
         MapLocation.Local local => ChunkCentre(local.RegionalCoordinate),
-        MapLocation.Dungeon dungeon => new Vector2(
-            _navigation.Campaign.Dungeon.GetLevel(dungeon.Depth).Width * DungeonTileSize / 2f,
-            _navigation.Campaign.Dungeon.GetLevel(dungeon.Depth).Height * DungeonTileSize / 2f),
+        MapLocation.Dungeon => new Vector2(240f, 120f),
         _ => Vector2.Zero,
     };
 

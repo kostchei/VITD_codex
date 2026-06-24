@@ -20,6 +20,10 @@ public partial class MapScreen : Control
     private readonly Button _forcedMarchButton = new() { Text = "Forced march (+6 miles)" };
     private readonly Button _restButton = new() { Text = "Rest" };
     private readonly Button _recentrePartyButton = new() { Text = "Recentre on party" };
+    private readonly Button _moveRuinButton = new() { Text = "Move room" };
+    private readonly Button _searchRuinButton = new() { Text = "Search room" };
+    private readonly Button _descendRuinButton = new() { Text = "Descend" };
+    private readonly AcceptDialog _resolutionDialog = new() { Title = "Resolution" };
     private readonly MenuButton _campaignMenu = new() { Text = "Campaign" };
     private readonly ConfirmationDialog _newCampaignConfirmation = new()
     {
@@ -69,6 +73,9 @@ public partial class MapScreen : Control
         travelRow.AddChild(_forcedMarchButton);
         travelRow.AddChild(_restButton);
         travelRow.AddChild(_recentrePartyButton);
+        travelRow.AddChild(_moveRuinButton);
+        travelRow.AddChild(_searchRuinButton);
+        travelRow.AddChild(_descendRuinButton);
         root.AddChild(travelRow);
 
         var depthRow = new HBoxContainer();
@@ -138,10 +145,14 @@ public partial class MapScreen : Control
         _forcedMarchButton.Pressed += BeginForcedMarch;
         _restButton.Pressed += RestParty;
         _recentrePartyButton.Pressed += RecentreOnParty;
+        _moveRuinButton.Pressed += MoveRuinRoom;
+        _searchRuinButton.Pressed += SearchRuinRoom;
+        _descendRuinButton.Pressed += DescendRuin;
         _campaignMenu.GetPopup().AddItem("New regional map", NewRegionalMapMenuId);
         _campaignMenu.GetPopup().IdPressed += ShowCampaignMenuAction;
         _newCampaignConfirmation.Confirmed += StartNewRegionalMap;
         AddChild(_newCampaignConfirmation);
+        AddChild(_resolutionDialog);
         RefreshUi();
     }
 
@@ -238,6 +249,50 @@ public partial class MapScreen : Control
         RefreshUi();
     }
 
+    private void MoveRuinRoom()
+    {
+        if (_navigation.Current is not MapLocation.Dungeon || _mapCanvas?.SelectedRuinRoom is not { } target)
+        {
+            _inspector.Text = "Select a connected Ruin room first.";
+            return;
+        }
+        if (_navigation.Campaign.TryMoveRuinRoom(target))
+        {
+            ShowResolution($"Moved to Ruin room {target}. 10 minutes pass. Resolve its feature, encounter, treasure, or referee choice from the inspector.");
+            CampaignFile.Save(_navigation.Campaign, _campaignPath);
+        }
+        else
+        {
+            _inspector.Text = "That room is not connected to the current Ruin room.";
+        }
+        RefreshUi();
+    }
+
+    private void SearchRuinRoom()
+    {
+        if (_navigation.Current is not MapLocation.Dungeon) return;
+        _navigation.Campaign.SearchRuinRoom();
+        ShowResolution($"Searched Ruin room {_navigation.Campaign.Ruin.CurrentRoom}. 30 minutes pass; room effects and choices are shown in the inspector.");
+        CampaignFile.Save(_navigation.Campaign, _campaignPath);
+        RefreshUi();
+    }
+
+    private void DescendRuin()
+    {
+        if (_navigation.Current is not MapLocation.Dungeon) return;
+        _navigation.Campaign.DescendRuin();
+        _navigation.SetDungeonDepth(_navigation.Campaign.Ruin.Depth);
+        ShowResolution($"Descended to Ruin depth {_navigation.Campaign.Ruin.Depth}. A new generated room graph is active.");
+        CampaignFile.Save(_navigation.Campaign, _campaignPath);
+        RefreshUi();
+    }
+
+    private void ShowResolution(string text)
+    {
+        _resolutionDialog.DialogText = text;
+        _resolutionDialog.PopupCentered();
+    }
+
     private void ShowCampaignMenuAction(long id)
     {
         if (id == NewRegionalMapMenuId)
@@ -267,6 +322,10 @@ public partial class MapScreen : Control
         _movePartyButton.Disabled = !viewingPartyLocalMap || _mapCanvas?.SelectedLocalCoordinate is null || partyTravel.RestRequired;
         _forcedMarchButton.Disabled = !partyTravel.CanForcedMarch;
         _restButton.Disabled = false;
+        var inRuin = current is MapLocation.Dungeon;
+        _moveRuinButton.Disabled = !inRuin;
+        _searchRuinButton.Disabled = !inRuin;
+        _descendRuinButton.Disabled = !inRuin;
 
         foreach (var button in _depthButtons)
         {

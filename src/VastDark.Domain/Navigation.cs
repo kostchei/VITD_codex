@@ -25,6 +25,7 @@ public sealed class Campaign
         _random = random ?? Random.Shared;
         Regional = new RegionalMap(_random);
         Dungeon = PrototypeDungeonBuilder.CreateSixLevelDungeon();
+        Ruin = new RuinExploration(RuinGenerationRules.RollAndGenerate(new SystemRandomSource(_random)), new GridCoord(0, 0));
         Party = new TravelParty([new Traveler("Expedition")]);
         PartyTravel = new PartyTravelState(new RegionalCoord(0, 0), HexCoord.Zero);
         _travelLog = [];
@@ -36,6 +37,7 @@ public sealed class Campaign
         _random = Random.Shared;
         Regional = new RegionalMap(state.RegionalCells ?? throw new InvalidDataException("The campaign save is missing regional cells."));
         Dungeon = PrototypeDungeonBuilder.CreateSixLevelDungeon();
+        Ruin = new RuinExploration(RuinGenerationRules.RollAndGenerate(new SystemRandomSource(_random)), new GridCoord(0, 0));
 
         foreach (var localState in state.LocalMaps ?? throw new InvalidDataException("The campaign save is missing local maps."))
         {
@@ -79,6 +81,7 @@ public sealed class Campaign
 
     public RegionalMap Regional { get; }
     public Dungeon Dungeon { get; }
+    public RuinExploration Ruin { get; }
     public TravelParty Party { get; }
     public PartyTravelState PartyTravel { get; }
     public IReadOnlyList<TravelLogEntryState> TravelLog => _travelLog;
@@ -111,6 +114,16 @@ public sealed class Campaign
 
     public bool IsPartyAtDungeonEntrance =>
         PartyTravel.RegionalCoordinate == DungeonRegionalCoordinate && PartyTravel.LocalCoordinate == DungeonLocalCoordinate;
+
+    public bool TryMoveRuinRoom(GridCoord target) => Ruin.TryMoveToRoom(target);
+
+    public void SearchRuinRoom() => Ruin.SearchCurrentRoom();
+
+    public void DescendRuin()
+    {
+        var next = RuinGenerationRules.RollAndGenerate(new SystemRandomSource(_random));
+        Ruin.Descend(next, new GridCoord(0, 0));
+    }
 
     public IReadOnlyList<RegionalCoord> GetLocalArea(RegionalCoord centre)
     {
