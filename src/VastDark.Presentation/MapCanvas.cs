@@ -36,8 +36,10 @@ public partial class MapCanvas : Control
     private string _viewKey = string.Empty;
     private MapLocation? _lastLocation;
     private RegionalCoord? _selectedRegional;
+    private IReadOnlyList<RegionalCoord> _previewRegionalPath = [];
     private LocalMapCoord? _selectedLocal;
     private GridCoord? _selectedGrid;
+    private IReadOnlyList<LocalMapCoord> _previewLocalPath = [];
 
     public MapCanvas(MapNavigationService navigation)
     {
@@ -47,9 +49,13 @@ public partial class MapCanvas : Control
     }
 
     public event Action<string>? CellSelected;
+    public event Action<IReadOnlyList<LocalMapCoord>>? PartyPathRequested;
+    public event Action<IReadOnlyList<RegionalCoord>>? RegionalPathRequested;
 
     public LocalMapCoord? SelectedLocalCoordinate => _selectedLocal;
     public GridCoord? SelectedRuinRoom => _selectedGrid;
+    public IReadOnlyList<LocalMapCoord> PreviewLocalPath => _previewLocalPath;
+    public IReadOnlyList<RegionalCoord> PreviewRegionalPath => _previewRegionalPath;
 
     public void SetNavigation(MapNavigationService navigation)
     {
@@ -57,8 +63,10 @@ public partial class MapCanvas : Control
         _viewKey = string.Empty;
         _lastLocation = null;
         _selectedRegional = null;
+        _previewRegionalPath = [];
         _selectedLocal = null;
         _selectedGrid = null;
+        _previewLocalPath = [];
         QueueRedraw();
     }
 
@@ -140,6 +148,16 @@ public partial class MapCanvas : Control
             {
                 SelectAt(mouseButton.Position);
             }
+            else if (mouseButton.Pressed && mouseButton.ButtonIndex == MouseButton.Right && _navigation.Current is MapLocation.Local local)
+            {
+                SelectLocal(mouseButton.Position, local.RegionalCoordinate);
+                if (_previewLocalPath.Count > 1 && _selectedLocal == _previewLocalPath[^1]) PartyPathRequested?.Invoke(_previewLocalPath);
+            }
+            else if (mouseButton.Pressed && mouseButton.ButtonIndex == MouseButton.Right && _navigation.Current is MapLocation.Regional)
+            {
+                SelectRegional(mouseButton.Position);
+                if (_previewRegionalPath.Count > 1 && _selectedRegional == _previewRegionalPath[^1]) RegionalPathRequested?.Invoke(_previewRegionalPath);
+            }
         }
         else if (@event is InputEventMouseMotion motion && _dragging)
         {
@@ -163,7 +181,6 @@ public partial class MapCanvas : Control
 
     private void DrawLocalArea(RegionalCoord centre)
     {
-        var reachableMoves = _navigation.Campaign.GetAvailablePartyMoves().ToHashSet();
         foreach (var regionalCoordinate in _navigation.Campaign.GetLocalArea(centre))
         {
             var map = _navigation.Campaign.GetLocalMap(regionalCoordinate);
@@ -180,10 +197,6 @@ public partial class MapCanvas : Control
                     map.VisibleCells.Contains(cell),
                     _selectedLocal == location,
                     isEntrance ? new Color("d97735") : null);
-                if (reachableMoves.Contains(location))
-                {
-                    DrawMovementOption(LocalWorldCentre(regionalCoordinate, cell));
-                }
             }
 
             foreach (var (coordinate, dieRoll) in map.RoamingHazards)
@@ -198,6 +211,11 @@ public partial class MapCanvas : Control
         }
 
         var partyTravel = _navigation.Campaign.PartyTravel;
+        if (_previewLocalPath.Count > 1)
+        {
+            DrawPolyline(_previewLocalPath.Select(step => ToScreen(LocalWorldCentre(step.RegionalCoordinate, step.LocalCoordinate))).ToArray(), Selection, Math.Max(3f, _zoom * 3f));
+        }
+        if (_previewRegionalPath.Count > 1) DrawPolyline(_previewRegionalPath.Select(cell => ToScreen(RegionalCentre(cell))).ToArray(), Selection, Math.Max(3f, _zoom * 3f));
         DrawPartyMarker(LocalWorldCentre(partyTravel.RegionalCoordinate, partyTravel.LocalCoordinate), LocalHexRadius);
     }
 
@@ -474,9 +492,33 @@ public partial class MapCanvas : Control
         }
 
         _selectedRegional = selected;
+        _previewRegionalPath = BuildRegionalPath(selected.Value);
         _navigation.SelectRegional(selected.Value);
         var terrain = _navigation.Campaign.Regional.GetTerrain(selected.Value);
-        CellSelected?.Invoke($"Regional hex {selected.Value}\n\nTerrain: {terrain}\nScale: 6 miles per hex.\n\nThis regional hex owns one local map.");
+        var route = _previewRegionalPath.Count > 1 ? $"\n\nRoute: {_previewRegionalPath.Count - 1} regional hex(es), {(_previewRegionalPath.Count - 1) * 6} miles. Right-click endpoint to travel." : string.Empty;
+        CellSelected?.Invoke($"Regional hex {selected.Value}\n\nTerrain: {terrain}\nScale: 6 miles per hex.{route}\n\nThis regional hex owns one local map.");
+    }
+
+    private IReadOnlyList<RegionalCoord> BuildRegionalPath(RegionalCoord target)
+    {
+        var origin = _navigation.Campaign.PartyTravel.RegionalCoordinate;
+        var queue = new Queue<RegionalCoord>();
+        var previous = new Dictionary<RegionalCoord, RegionalCoord?> { [origin] = null };
+        queue.Enqueue(origin);
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            if (current == target) break;
+            for (var direction = 0; direction < HexCoord.Directions.Count; direction++)
+            {
+                if (_navigation.Campaign.Regional.GetNeighbour(current, direction) is { } next && previous.TryAdd(next, current)) queue.Enqueue(next);
+            }
+        }
+        if (!previous.ContainsKey(target)) return [];
+        var path = new List<RegionalCoord>();
+        for (RegionalCoord? cursor = target; cursor is not null; cursor = previous[cursor.Value]) path.Add(cursor.Value);
+        path.Reverse();
+        return path;
     }
 
     private void SelectLocal(Vector2 screenPosition, RegionalCoord centre)
@@ -496,14 +538,41 @@ public partial class MapCanvas : Control
         }
 
         _selectedLocal = selected;
+        _previewLocalPath = BuildLocalPath(selected.Value);
         var map = _navigation.Campaign.GetLocalMap(selected.Value.RegionalCoordinate);
         var isEntrance = map.Parent == Campaign.DungeonRegionalCoordinate && selected.Value.LocalCoordinate == Campaign.DungeonLocalCoordinate;
         var terrain = map.GetTerrain(selected.Value.LocalCoordinate);
         var hazardText = map.RoamingHazards.TryGetValue(selected.Value.LocalCoordinate, out var dieRoll)
             ? $"\n\nRoaming hazard: {LocalMap.GetRoamingHazardName(dieRoll)} (d6: {dieRoll})."
             : string.Empty;
-        var reachable = _navigation.Campaign.GetAvailablePartyMoves().Contains(selected.Value) ? "\n\nReachable: move party here costs 1 mile." : string.Empty;
-        CellSelected?.Invoke($"Local subhex {selected.Value.LocalCoordinate} in regional hex {selected.Value.RegionalCoordinate}\n\nTerrain: {terrain}\nScale: 1 mile per subhex.{reachable}{hazardText}{(isEntrance ? "\n\nOrange marker: dungeon entrance." : string.Empty)}");
+        var route = _previewLocalPath.Count > 1 ? $"\n\nRoute: {_previewLocalPath.Count - 1} mile(s). Right-click this endpoint to travel." : string.Empty;
+        CellSelected?.Invoke($"Local subhex {selected.Value.LocalCoordinate} in regional hex {selected.Value.RegionalCoordinate}\n\nTerrain: {terrain}\nScale: 1 mile per subhex.{route}{hazardText}{(isEntrance ? "\n\nOrange marker: dungeon entrance." : string.Empty)}");
+    }
+
+    private IReadOnlyList<LocalMapCoord> BuildLocalPath(LocalMapCoord target)
+    {
+        var party = _navigation.Campaign.PartyTravel;
+        if (target.RegionalCoordinate != party.RegionalCoordinate || party.RestRequired) return [];
+        var origin = party.LocalCoordinate;
+        var map = _navigation.Campaign.GetLocalMap(party.RegionalCoordinate);
+        var queue = new Queue<HexCoord>();
+        var previous = new Dictionary<HexCoord, HexCoord?> { [origin] = null };
+        queue.Enqueue(origin);
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            if (current == target.LocalCoordinate) break;
+            for (var direction = 0; direction < HexCoord.Directions.Count; direction++)
+            {
+                var next = current.Neighbour(direction);
+                if (map.VisibleCells.Contains(next) && previous.TryAdd(next, current)) queue.Enqueue(next);
+            }
+        }
+        if (!previous.ContainsKey(target.LocalCoordinate)) return [];
+        var path = new List<LocalMapCoord>();
+        for (HexCoord? cursor = target.LocalCoordinate; cursor is not null; cursor = previous[cursor.Value]) path.Add(new LocalMapCoord(party.RegionalCoordinate, cursor.Value));
+        path.Reverse();
+        return path;
     }
 
     private void SelectDungeon(Vector2 screenPosition, DungeonLevel level)

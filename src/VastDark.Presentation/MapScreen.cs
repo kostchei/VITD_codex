@@ -32,6 +32,7 @@ public partial class MapScreen : Control
     };
     private readonly List<Button> _depthButtons = [];
     private MapCanvas? _mapCanvas;
+    private bool _animatingParty;
 
     public MapScreen()
     {
@@ -104,6 +105,8 @@ public partial class MapScreen : Control
             CustomMinimumSize = new Vector2(800, 600),
         };
         _mapCanvas.CellSelected += SetInspectorText;
+        _mapCanvas.PartyPathRequested += AnimatePartyAlongPath;
+        _mapCanvas.RegionalPathRequested += AnimateRegionalPath;
         content.AddChild(_mapCanvas);
 
         var sidebar = new VBoxContainer
@@ -197,6 +200,11 @@ public partial class MapScreen : Control
 
     private void MovePartyToSelectedHex()
     {
+        if (_mapCanvas?.PreviewLocalPath.Count > 1)
+        {
+            AnimatePartyAlongPath(_mapCanvas.PreviewLocalPath);
+            return;
+        }
         if (_navigation.Current is not MapLocation.Local local || _mapCanvas?.SelectedLocalCoordinate is not { } target)
         {
             _inspector.Text = "Open the party's local map and select an adjacent local hex first.";
@@ -247,6 +255,54 @@ public partial class MapScreen : Control
 
         _inspector.Text = result.Message;
         RefreshUi();
+    }
+
+    private async void AnimatePartyAlongPath(IReadOnlyList<LocalMapCoord> path)
+    {
+        if (_animatingParty || path.Count < 2) return;
+        _animatingParty = true;
+        try
+        {
+            for (var index = 1; index < path.Count; index++)
+            {
+                var step = path[index];
+                var result = _navigation.Campaign.TryMoveParty(step.RegionalCoordinate, step.LocalCoordinate);
+                _inspector.Text = result.Message;
+                _mapCanvas?.Refresh();
+                RefreshUi();
+                if (!result.Moved) break;
+                await ToSignal(GetTree().CreateTimer(0.14f), SceneTreeTimer.SignalName.Timeout);
+            }
+            CampaignFile.Save(_navigation.Campaign, _campaignPath);
+        }
+        finally
+        {
+            _animatingParty = false;
+            RefreshUi();
+        }
+    }
+
+    private async void AnimateRegionalPath(IReadOnlyList<RegionalCoord> path)
+    {
+        if (_animatingParty || path.Count < 2) return;
+        _animatingParty = true;
+        try
+        {
+            for (var index = 1; index < path.Count; index++)
+            {
+                var result = _navigation.Campaign.TryTravelRegionalStep(path[index]);
+                _inspector.Text = result.Message;
+                RefreshUi();
+                if (!result.Moved) break;
+                await ToSignal(GetTree().CreateTimer(0.45f), SceneTreeTimer.SignalName.Timeout);
+            }
+            CampaignFile.Save(_navigation.Campaign, _campaignPath);
+        }
+        finally
+        {
+            _animatingParty = false;
+            RefreshUi();
+        }
     }
 
     private void MoveRuinRoom()
@@ -319,7 +375,7 @@ public partial class MapScreen : Control
                                   !_navigation.Campaign.IsPartyAtDungeonEntrance;
         var partyTravel = _navigation.Campaign.PartyTravel;
         var viewingPartyLocalMap = current is MapLocation.Local partyLocal && partyLocal.RegionalCoordinate == partyTravel.RegionalCoordinate;
-        _movePartyButton.Disabled = !viewingPartyLocalMap || _mapCanvas?.SelectedLocalCoordinate is null || partyTravel.RestRequired;
+        _movePartyButton.Disabled = !viewingPartyLocalMap || _mapCanvas?.PreviewLocalPath.Count is not > 1 || partyTravel.RestRequired || _animatingParty;
         _forcedMarchButton.Disabled = !partyTravel.CanForcedMarch;
         _restButton.Disabled = false;
         var inRuin = current is MapLocation.Dungeon;

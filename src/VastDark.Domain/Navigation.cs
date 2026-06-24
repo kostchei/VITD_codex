@@ -195,6 +195,20 @@ public sealed class Campaign
         return MoveSucceeded(message);
     }
 
+    public PartyMoveResult TryTravelRegionalStep(RegionalCoord destination)
+    {
+        if (PartyTravel.RestRequired) return MoveFailed("Rest is required before regional travel.");
+        if (!Enumerable.Range(0, HexCoord.Directions.Count).Select(direction => Regional.GetNeighbour(PartyTravel.RegionalCoordinate, direction)).Any(neighbour => neighbour == destination))
+        {
+            return MoveFailed("The selected regional hex is not adjacent to the party.");
+        }
+        for (var mile = 0; mile < LocalMap.SideLengthInSubhexes && !PartyTravel.RestRequired; mile++)
+        {
+            PartyTravel.MoveTo(destination, HexCoord.Zero);
+        }
+        return MoveSucceeded($"Crossed into regional hex {destination}. {PartyTravel.DailyMiles} / {PartyTravel.DailyMileLimit} miles travelled.");
+    }
+
     public PartyMoveResult TryBeginForcedMarch()
     {
         if (!PartyTravel.CanForcedMarch)

@@ -306,6 +306,10 @@ Assert(wastesResult.CombatEnemyGroup == "Raiders", "Combat steps must expose the
 Assert(wastesParty.Members[0].Conditions.Contains("Shaken"), "Wastes effects must be committed after the entry resolves.");
 
 var movementCampaign = new Campaign(new Random(76543));
+var regionalTravelCampaign = new Campaign(new Random(8675309));
+var regionalOrigin = regionalTravelCampaign.PartyTravel.RegionalCoordinate;
+var regionalDestination = regionalTravelCampaign.Regional.GetNeighbour(regionalOrigin, 0)!.Value;
+Assert(regionalTravelCampaign.TryTravelRegionalStep(regionalDestination) is { Moved: true, DailyMiles: 6 } && regionalTravelCampaign.PartyTravel.RegionalCoordinate == regionalDestination, "Regional path steps must move the party one adjacent regional hex and consume six local miles.");
 var earlyRestCampaign = new Campaign(new Random(4242));
 Assert(earlyRestCampaign.TryRestParty().Moved && earlyRestCampaign.PartyTravel.Day == 2 && earlyRestCampaign.PartyTravel.DailyMiles == 0 && earlyRestCampaign.Party.TotalExhaustion == 1, "An early rest must begin a new 18-mile day and add hunger exhaustion when no ration is consumed.");
 var partyRegionalCoordinate = movementCampaign.PartyTravel.RegionalCoordinate;
