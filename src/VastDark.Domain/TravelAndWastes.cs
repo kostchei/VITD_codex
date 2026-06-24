@@ -22,8 +22,10 @@ public sealed class Traveler
     private readonly Dictionary<string, int> _resources = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _conditions = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<ExhaustionSource> _exhaustionSources = [];
+    private readonly HashSet<WastesFaction> _wastesFactions = [];
+    private readonly HashSet<SettlementFaction> _settlementFactions = [];
 
-    public Traveler(string name, int health = 10, int rations = 0, AbilityScores? abilityScores = null, int level = 1, Vitality? vitality = null)
+    public Traveler(string name, int health = 10, int rations = 0, AbilityScores? abilityScores = null, int level = 1, Vitality? vitality = null, TravelerRulesState? rules = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         if (health < 0 || rations < 0 || level < 1)
@@ -37,6 +39,12 @@ public sealed class Traveler
         AbilityScores = abilityScores ?? AbilityScores.Average;
         Level = level;
         Vitality = vitality;
+        Inventory = new TravelerInventory(GetAbilityModifier(Ability.Constitution), rules);
+        Rites = new RiteLedger(rules);
+        Gifts = new DeepGiftState(rules);
+        foreach (var faction in rules?.WastesFactions ?? []) _wastesFactions.Add(faction);
+        foreach (var faction in rules?.SettlementFactions ?? []) _settlementFactions.Add(faction);
+        if (rules?.Memories is { Count: 5 } memories) Harrowing = new Harrowing(memories);
     }
 
     public Traveler(TravelerState state)
@@ -46,7 +54,8 @@ public sealed class Traveler
             state.Rations,
             state.AbilityScores,
             state.Level,
-            state.Vitality)
+            state.Vitality,
+            state.Rules)
     {
         if (state.ExhaustionSources is { Count: > 0 })
         {
@@ -79,6 +88,12 @@ public sealed class Traveler
     public int Exhaustion { get; private set; }
     public int Level { get; }
     public Vitality? Vitality { get; private set; }
+    public TravelerInventory Inventory { get; }
+    public RiteLedger Rites { get; }
+    public DeepGiftState Gifts { get; }
+    public Harrowing? Harrowing { get; private set; }
+    public IReadOnlySet<WastesFaction> WastesFactions => _wastesFactions;
+    public IReadOnlySet<SettlementFaction> SettlementFactions => _settlementFactions;
     public IReadOnlyList<ExhaustionSource> ExhaustionSources => _exhaustionSources;
     public AbilityScores AbilityScores { get; }
     public IReadOnlyCollection<string> Conditions => _conditions;
@@ -88,6 +103,10 @@ public sealed class Traveler
     public int GetAbilityScore(Ability ability) => AbilityScores[ability];
 
     public int GetAbilityModifier(Ability ability) => AbilityScores.Modifier(ability);
+
+    public void SetHarrowing(IEnumerable<string> memories) => Harrowing = new Harrowing(memories);
+    public void JoinFaction(WastesFaction faction) => _wastesFactions.Add(faction);
+    public void JoinFaction(SettlementFaction faction) => _settlementFactions.Add(faction);
 
     public static Traveler CreateWithVitality(string name, AbilityScores scores, int level, IEnumerable<int> d8Rolls, int rations = 0) =>
         new(name, rations: rations, abilityScores: scores, level: level, vitality: VitalityRules.CreateStartingVitality(level, scores, d8Rolls));
@@ -222,7 +241,16 @@ public sealed class Traveler
         AbilityScores,
         _exhaustionSources.ToList(),
         Level,
-        Vitality);
+        Vitality,
+        CreateRulesState());
+
+    private TravelerRulesState CreateRulesState()
+    {
+        var inventory = Inventory.ToState();
+        var rites = Rites.ToState();
+        var gifts = Gifts.ToState();
+        return new TravelerRulesState(inventory.Items, inventory.Loadouts, inventory.Packs, Harrowing?.RemainingMemories.ToList(), rites.Rites, rites.Locked, rites.Motions, gifts.Gifts, gifts.DailyUses, _wastesFactions.ToList(), _settlementFactions.ToList());
+    }
 }
 
 public sealed class TravelParty

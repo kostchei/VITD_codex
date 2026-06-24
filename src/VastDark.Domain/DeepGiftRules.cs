@@ -8,6 +8,13 @@ public sealed class DeepGiftState
     private readonly List<DeepGift> _gifts = [];
     private readonly HashSet<DeepGift> _dailyUses = [];
     public IReadOnlyList<DeepGift> Gifts => _gifts;
+    public DeepGiftState() { }
+    public DeepGiftState(TravelerRulesState? state)
+    {
+        _gifts.AddRange(state?.Gifts ?? []);
+        foreach (var gift in state?.GiftDailyUses ?? []) _dailyUses.Add(gift);
+    }
+    public (List<DeepGift> Gifts, List<DeepGift> DailyUses) ToState() => (_gifts.ToList(), _dailyUses.ToList());
     public DeepGift GainOnEnterOrNewLevel(IRandomSource random)
     {
         ArgumentNullException.ThrowIfNull(random);

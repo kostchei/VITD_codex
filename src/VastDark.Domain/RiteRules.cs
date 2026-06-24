@@ -8,6 +8,14 @@ public sealed class RiteLedger
     private readonly HashSet<string> _firstMotionLocations = new(StringComparer.OrdinalIgnoreCase);
     public int Rites { get; private set; }
     public int LockedErosionExhaustion { get; private set; }
+    public RiteLedger() { }
+    public RiteLedger(TravelerRulesState? state)
+    {
+        Rites = state?.Rites ?? 0;
+        LockedErosionExhaustion = state?.LockedErosionExhaustion ?? 0;
+        foreach (var location in state?.RiteMotionLocations ?? []) _firstMotionLocations.Add(location);
+    }
+    public (int Rites, int Locked, List<string> Motions) ToState() => (Rites, LockedErosionExhaustion, _firstMotionLocations.Order().ToList());
     public bool GainFromMotion(string locationId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(locationId);

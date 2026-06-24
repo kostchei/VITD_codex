@@ -47,6 +47,13 @@ public sealed class TravelerInventory
         ConstitutionModifier = constitutionModifier;
     }
 
+    public TravelerInventory(int constitutionModifier, TravelerRulesState? state) : this(constitutionModifier)
+    {
+        foreach (var pack in state?.Packs ?? []) _packs.Add(pack);
+        foreach (var item in state?.Items ?? []) _items.Add(new InventoryItem(item.Name, item.Slots, item.IsUniqueOrMagical));
+        foreach (var loadout in state?.Loadouts ?? []) _loadoutSlots[loadout.Purpose] = loadout.Slots;
+    }
+
     public int ConstitutionModifier { get; }
     public int BaseSlots => Math.Max(0, ConstitutionModifier);
     public int PackSlots => _packs.Sum(pack => InventoryRules.GetPack(pack).AdditionalSlots);
@@ -56,6 +63,9 @@ public sealed class TravelerInventory
     public IReadOnlyList<InventoryItem> Items => _items;
     public IReadOnlyList<LoadoutAllocation> Loadouts => _loadoutSlots.OrderBy(pair => pair.Key).Select(pair => new LoadoutAllocation(pair.Key, pair.Value)).ToList();
     public IReadOnlyList<PackType> Packs => _packs;
+
+    public (List<InventoryItemState> Items, List<LoadoutState> Loadouts, List<PackType> Packs) ToState() =>
+        (_items.Select(item => new InventoryItemState(item.Name, item.Slots, item.IsUniqueOrMagical)).ToList(), Loadouts.Select(loadout => new LoadoutState(loadout.Purpose, loadout.Slots)).ToList(), _packs.ToList());
 
     public int BuyPackAtSettlement(PackType type, int availableCoins, bool atSettlement)
     {

@@ -10,6 +10,21 @@ public sealed record RoamingHazardState(int Q, int R, int DieRoll);
 
 public sealed record NamedValueState(string Name, int Value);
 
+public sealed record InventoryItemState(string Name, int Slots, bool IsUniqueOrMagical);
+public sealed record LoadoutState(string Purpose, int Slots);
+public sealed record TravelerRulesState(
+    List<InventoryItemState>? Items = null,
+    List<LoadoutState>? Loadouts = null,
+    List<PackType>? Packs = null,
+    List<string>? Memories = null,
+    int Rites = 0,
+    int LockedErosionExhaustion = 0,
+    List<string>? RiteMotionLocations = null,
+    List<DeepGift>? Gifts = null,
+    List<DeepGift>? GiftDailyUses = null,
+    List<WastesFaction>? WastesFactions = null,
+    List<SettlementFaction>? SettlementFactions = null);
+
 public sealed record TravelerState(
     string Name,
     int Health,
@@ -21,7 +36,8 @@ public sealed record TravelerState(
     AbilityScores? AbilityScores = null,
     List<ExhaustionSource>? ExhaustionSources = null,
     int Level = 1,
-    Vitality? Vitality = null);
+    Vitality? Vitality = null,
+    TravelerRulesState? Rules = null);
 
 public sealed record PartyState(List<TravelerState> Members);
 

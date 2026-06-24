@@ -288,7 +288,11 @@ public partial class MapScreen : Control
             var resources = member.Resources.Count == 0
                 ? "none"
                 : string.Join(", ", member.Resources.Where(resource => resource.Value > 0).OrderBy(resource => resource.Key).Select(resource => $"{resource.Key} {resource.Value}"));
-            return $"{member.Name}: HP {member.Health} | Rations {member.Rations} | Exhaustion {member.Exhaustion}\nConditions: {conditions}\nResources: {resources}";
+            var scores = string.Join(" ", Enum.GetValues<Ability>().Select(ability => $"{ability.ToString()[0..3].ToUpperInvariant()} {member.GetAbilityScore(ability):00} ({member.GetAbilityModifier(ability):+0;-0;0})"));
+            var vitality = member.Vitality is { } value ? $"Grit {value.Grit} | Flesh {value.Flesh}" : $"HP {member.Health}";
+            var memories = member.Harrowing is null ? "unassigned" : string.Join("; ", member.Harrowing.RemainingMemories);
+            var factions = string.Join(", ", member.WastesFactions.Select(faction => faction.ToString()).Concat(member.SettlementFactions.Select(faction => faction.ToString())));
+            return $"{member.Name}: Level {member.Level} | {vitality} | Rations {member.Rations} | Exhaustion {member.Exhaustion}\n{scores}\nInventory {member.Inventory.UsedSlots}/{member.Inventory.Capacity} slots | Rites {member.Rites.Rites} | Gifts: {(member.Gifts.Gifts.Count == 0 ? "none" : string.Join(", ", member.Gifts.Gifts))}\nMemories: {memories}\nFactions: {(string.IsNullOrEmpty(factions) ? "none" : factions)}\nConditions: {conditions}\nResources: {resources}";
         }));
         _travelLog.Text = _navigation.Campaign.TravelLog.Count == 0
             ? "No travel recorded yet."
