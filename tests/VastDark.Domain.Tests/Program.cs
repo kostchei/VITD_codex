@@ -306,6 +306,16 @@ Assert(wastesResult.CombatEnemyGroup == "Raiders", "Combat steps must expose the
 Assert(wastesParty.Members[0].Conditions.Contains("Shaken"), "Wastes effects must be committed after the entry resolves.");
 
 var movementCampaign = new Campaign(new Random(76543));
+var interruptionCampaign = new Campaign(new Random(24680));
+var interruptionRegion = interruptionCampaign.PartyTravel.RegionalCoordinate;
+var interruptionMap = interruptionCampaign.GetLocalMap(interruptionRegion);
+var hazardCoordinate = interruptionMap.RoamingHazards.Keys.First();
+Assert(interruptionCampaign.GetTravelInterruption(interruptionRegion, hazardCoordinate) is { Kind: TravelInterruptionKind.RoamingHazard }, "Entering a hex with a roaming hazard must interrupt travel before terrain resolution.");
+var terrainStop = interruptionMap.VisibleCells.FirstOrDefault(cell => interruptionMap.GetTerrain(cell) is Terrain.Ruins or Terrain.Settlements);
+if (interruptionMap.VisibleCells.Contains(terrainStop) && !interruptionMap.RoamingHazards.ContainsKey(terrainStop))
+{
+    Assert(interruptionCampaign.GetTravelInterruption(interruptionRegion, terrainStop) is { Kind: TravelInterruptionKind.Ruins or TravelInterruptionKind.Settlement }, "Entering Ruins or a Settlement must interrupt travel.");
+}
 var regionalTravelCampaign = new Campaign(new Random(8675309));
 var regionalOrigin = regionalTravelCampaign.PartyTravel.RegionalCoordinate;
 var regionalDestination = regionalTravelCampaign.Regional.GetNeighbour(regionalOrigin, 0)!.Value;

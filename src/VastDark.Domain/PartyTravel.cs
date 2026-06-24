@@ -96,6 +96,19 @@ public sealed class PartyTravelState
         Rations: 0);
 }
 
-public sealed record PartyMoveResult(bool Moved, string Message, int DailyMiles, int DailyMileLimit, bool RestRequired);
+public enum TravelInterruptionKind { Ruins, Settlement, RoamingHazard }
+
+public sealed record TravelInterruption(TravelInterruptionKind Kind, Terrain Terrain, int? HazardDieRoll = null)
+{
+    public string Title => Kind switch
+    {
+        TravelInterruptionKind.Ruins => "Ruins encountered",
+        TravelInterruptionKind.Settlement => "Settlement reached",
+        TravelInterruptionKind.RoamingHazard => $"Roaming hazard: {LocalMap.GetRoamingHazardName(HazardDieRoll!.Value)}",
+        _ => "Travel interrupted",
+    };
+}
+
+public sealed record PartyMoveResult(bool Moved, string Message, int DailyMiles, int DailyMileLimit, bool RestRequired, TravelInterruption? Interruption = null);
 
 public sealed record PartyRestResult(int FedTravelers, int UnfedTravelers);

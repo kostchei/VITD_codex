@@ -24,6 +24,7 @@ public partial class MapScreen : Control
     private readonly Button _searchRuinButton = new() { Text = "Search room" };
     private readonly Button _descendRuinButton = new() { Text = "Descend" };
     private readonly AcceptDialog _resolutionDialog = new() { Title = "Resolution" };
+    private readonly EncounterScreen _encounterScreen = new();
     private readonly MenuButton _campaignMenu = new() { Text = "Campaign" };
     private readonly ConfirmationDialog _newCampaignConfirmation = new()
     {
@@ -156,6 +157,7 @@ public partial class MapScreen : Control
         _newCampaignConfirmation.Confirmed += StartNewRegionalMap;
         AddChild(_newCampaignConfirmation);
         AddChild(_resolutionDialog);
+        AddChild(_encounterScreen);
         RefreshUi();
     }
 
@@ -223,6 +225,7 @@ public partial class MapScreen : Control
         }
 
         _inspector.Text = result.Message;
+        if (result.Interruption is { } interruption) _encounterScreen.Present(interruption);
         RefreshUi();
     }
 
@@ -268,6 +271,11 @@ public partial class MapScreen : Control
                 var step = path[index];
                 var result = _navigation.Campaign.TryMoveParty(step.RegionalCoordinate, step.LocalCoordinate);
                 _inspector.Text = result.Message;
+                if (result.Interruption is { } interruption)
+                {
+                    _encounterScreen.Present(interruption);
+                    break;
+                }
                 _mapCanvas?.Refresh();
                 RefreshUi();
                 if (!result.Moved) break;
@@ -292,6 +300,11 @@ public partial class MapScreen : Control
             {
                 var result = _navigation.Campaign.TryTravelRegionalStep(path[index]);
                 _inspector.Text = result.Message;
+                if (result.Interruption is { } interruption)
+                {
+                    _encounterScreen.Present(interruption);
+                    break;
+                }
                 RefreshUi();
                 if (!result.Moved) break;
                 await ToSignal(GetTree().CreateTimer(0.45f), SceneTreeTimer.SignalName.Timeout);

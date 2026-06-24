@@ -187,12 +187,13 @@ public sealed class Campaign
 
         var crossedRegionalBoundary = PartyTravel.RegionalCoordinate != localMapCoordinate;
         PartyTravel.MoveTo(localMapCoordinate, target);
+        var interruption = GetTravelInterruption(localMapCoordinate, target);
         var message = PartyTravel.RestRequired
             ? $"Moved 1 mile. {PartyTravel.DailyMiles} / {PartyTravel.DailyMileLimit} miles; rest is required."
             : crossedRegionalBoundary
                 ? $"Crossed into regional hex {localMapCoordinate}. Moved 1 mile; {PartyTravel.DailyMiles} / {PartyTravel.DailyMileLimit} miles."
                 : $"Moved 1 mile. {PartyTravel.DailyMiles} / {PartyTravel.DailyMileLimit} miles.";
-        return MoveSucceeded(message);
+        return MoveSucceeded(message, interruption);
     }
 
     public PartyMoveResult TryTravelRegionalStep(RegionalCoord destination)
@@ -206,7 +207,7 @@ public sealed class Campaign
         {
             PartyTravel.MoveTo(destination, HexCoord.Zero);
         }
-        return MoveSucceeded($"Crossed into regional hex {destination}. {PartyTravel.DailyMiles} / {PartyTravel.DailyMileLimit} miles travelled.");
+        return MoveSucceeded($"Crossed into regional hex {destination}. {PartyTravel.DailyMiles} / {PartyTravel.DailyMileLimit} miles travelled.", GetTravelInterruption(destination, HexCoord.Zero));
     }
 
     public PartyMoveResult TryBeginForcedMarch()
@@ -244,7 +245,20 @@ public sealed class Campaign
         PartyTravel.DailyMileLimit,
         PartyTravel.RestRequired);
 
-    private PartyMoveResult MoveSucceeded(string message)
+    public TravelInterruption? GetTravelInterruption(RegionalCoord regionalCoordinate, HexCoord localCoordinate)
+    {
+        var map = GetLocalMap(regionalCoordinate);
+        var terrain = map.GetTerrain(localCoordinate);
+        if (map.RoamingHazards.TryGetValue(localCoordinate, out var hazard)) return new TravelInterruption(TravelInterruptionKind.RoamingHazard, terrain, hazard);
+        return terrain switch
+        {
+            Terrain.Ruins => new TravelInterruption(TravelInterruptionKind.Ruins, terrain),
+            Terrain.Settlements => new TravelInterruption(TravelInterruptionKind.Settlement, terrain),
+            _ => null,
+        };
+    }
+
+    private PartyMoveResult MoveSucceeded(string message, TravelInterruption? interruption = null)
     {
         _travelLog.Add(new TravelLogEntryState(PartyTravel.Day, message));
         if (_travelLog.Count > 100)
@@ -252,7 +266,7 @@ public sealed class Campaign
             _travelLog.RemoveRange(0, _travelLog.Count - 100);
         }
 
-        return new PartyMoveResult(true, message, PartyTravel.DailyMiles, PartyTravel.DailyMileLimit, PartyTravel.RestRequired);
+        return new PartyMoveResult(true, message, PartyTravel.DailyMiles, PartyTravel.DailyMileLimit, PartyTravel.RestRequired, interruption);
     }
 
     private HexCoord FindBoundaryEntry(RegionalCoord originRegion, HexCoord originLocal, int direction, RegionalCoord destinationRegion)
