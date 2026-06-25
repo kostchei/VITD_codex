@@ -11,8 +11,11 @@ public partial class MapScreen : Control
     private readonly Label _locationLabel = new();
     private readonly Label _travelLabel = new();
     private readonly Label _inspector = new();
+    private readonly Label _partySummary = new();
     private readonly Label _partyDetails = new();
     private readonly Label _travelLog = new();
+    private readonly Label _contextTitle = new();
+    private readonly VBoxContainer _contextActions = new();
     private readonly Button _regionalButton = new() { Text = "Regional" };
     private readonly Button _localButton = new() { Text = "Local" };
     private readonly Button _dungeonButton = new() { Text = "Dungeon" };
@@ -23,6 +26,14 @@ public partial class MapScreen : Control
     private readonly Button _moveRuinButton = new() { Text = "Move room" };
     private readonly Button _searchRuinButton = new() { Text = "Search room" };
     private readonly Button _descendRuinButton = new() { Text = "Descend" };
+    private readonly Button _buyRationButton = new() { Text = $"Buy ration ({Campaign.RationCoinCost} coins)" };
+    private readonly Button _refineLodestoneButton = new() { Text = "Refine Raw Lodestone" };
+    private readonly Button _gatherLodestoneButton = new() { Text = "Gather Lodestone (1h)" };
+    private readonly Button _mineLodestoneButton = new() { Text = "Mine Lodestone (1h, tools)" };
+    private readonly Button _enterPillarButton = new() { Text = "Delve into Pillar tunnels" };
+    private readonly Button _goDeeperPillarButton = new() { Text = "Go deeper (10 min)" };
+    private readonly Button _searchPillarButton = new() { Text = "Search tunnel (30 min)" };
+    private readonly Button _exitPillarButton = new() { Text = "Exit Pillar delve" };
     private readonly AcceptDialog _resolutionDialog = new() { Title = "Resolution" };
     private readonly EncounterScreen _encounterScreen = new();
     private readonly MenuButton _campaignMenu = new() { Text = "Campaign" };
@@ -132,8 +143,23 @@ public partial class MapScreen : Control
         var partyTitle = new Label { Text = "Party status" };
         partyTitle.AddThemeFontSizeOverride("font_size", 16);
         sidebar.AddChild(partyTitle);
+        _partySummary.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        sidebar.AddChild(_partySummary);
         _partyDetails.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         sidebar.AddChild(_partyDetails);
+
+        _contextTitle.AddThemeFontSizeOverride("font_size", 16);
+        sidebar.AddChild(_contextTitle);
+        _contextActions.AddThemeConstantOverride("separation", 6);
+        sidebar.AddChild(_contextActions);
+        _contextActions.AddChild(_buyRationButton);
+        _contextActions.AddChild(_refineLodestoneButton);
+        _contextActions.AddChild(_gatherLodestoneButton);
+        _contextActions.AddChild(_mineLodestoneButton);
+        _contextActions.AddChild(_enterPillarButton);
+        _contextActions.AddChild(_goDeeperPillarButton);
+        _contextActions.AddChild(_searchPillarButton);
+        _contextActions.AddChild(_exitPillarButton);
 
         var logTitle = new Label { Text = "Recent travel" };
         logTitle.AddThemeFontSizeOverride("font_size", 16);
@@ -152,6 +178,14 @@ public partial class MapScreen : Control
         _moveRuinButton.Pressed += MoveRuinRoom;
         _searchRuinButton.Pressed += SearchRuinRoom;
         _descendRuinButton.Pressed += DescendRuin;
+        _buyRationButton.Pressed += BuySettlementRation;
+        _refineLodestoneButton.Pressed += RefineSettlementLodestone;
+        _gatherLodestoneButton.Pressed += GatherPillarLodestone;
+        _mineLodestoneButton.Pressed += MinePillarLodestone;
+        _enterPillarButton.Pressed += EnterPillarDelve;
+        _goDeeperPillarButton.Pressed += GoDeeperInPillar;
+        _searchPillarButton.Pressed += SearchPillarTunnel;
+        _exitPillarButton.Pressed += ExitPillarDelve;
         _campaignMenu.GetPopup().AddItem("New regional map", NewRegionalMapMenuId);
         _campaignMenu.GetPopup().IdPressed += ShowCampaignMenuAction;
         _newCampaignConfirmation.Confirmed += StartNewRegionalMap;
@@ -225,7 +259,7 @@ public partial class MapScreen : Control
         }
 
         _inspector.Text = result.Message;
-        if (result.Interruption is { } interruption) _encounterScreen.Present(interruption);
+        if (result.Interruption is { } interruption) PresentInterruption(interruption);
         RefreshUi();
     }
 
@@ -273,7 +307,7 @@ public partial class MapScreen : Control
                 _inspector.Text = result.Message;
                 if (result.Interruption is { } interruption)
                 {
-                    _encounterScreen.Present(interruption);
+                    PresentInterruption(interruption);
                     break;
                 }
                 _mapCanvas?.Refresh();
@@ -302,7 +336,7 @@ public partial class MapScreen : Control
                 _inspector.Text = result.Message;
                 if (result.Interruption is { } interruption)
                 {
-                    _encounterScreen.Present(interruption);
+                    PresentInterruption(interruption);
                     break;
                 }
                 RefreshUi();
@@ -362,6 +396,44 @@ public partial class MapScreen : Control
         _resolutionDialog.PopupCentered();
     }
 
+    private void BuySettlementRation() => PresentCampaignAction(_navigation.Campaign.TryBuyRationsAtSettlement());
+
+    private void RefineSettlementLodestone() => PresentCampaignAction(_navigation.Campaign.TryRefineRawLodestoneAtSettlement());
+
+    private void GatherPillarLodestone() => PresentCampaignAction(_navigation.Campaign.TryWorkPillar(PillarWork.Gathering));
+
+    private void MinePillarLodestone() => PresentCampaignAction(_navigation.Campaign.TryWorkPillar(PillarWork.Mining));
+
+    private void EnterPillarDelve() => PresentCampaignAction(_navigation.Campaign.TryEnterPillarDelve());
+
+    private void GoDeeperInPillar() => PresentCampaignAction(_navigation.Campaign.TryGoDeeperInPillar());
+
+    private void SearchPillarTunnel() => PresentCampaignAction(_navigation.Campaign.TrySearchPillarTunnel());
+
+    private void ExitPillarDelve() => PresentCampaignAction(_navigation.Campaign.TryExitPillarDelve());
+
+    private void PresentCampaignAction(CampaignActionResult result)
+    {
+        _inspector.Text = result.Summary;
+        _resolutionDialog.Title = result.Title;
+        _resolutionDialog.DialogText = result.Summary;
+        _resolutionDialog.PopupCentered();
+        if (result.Applied)
+        {
+            CampaignFile.Save(_navigation.Campaign, _campaignPath);
+        }
+
+        RefreshUi();
+    }
+
+    private void PresentInterruption(TravelInterruption interruption)
+    {
+        var resolution = _navigation.Campaign.ResolveTravelInterruption(interruption);
+        _encounterScreen.Present(resolution);
+        CampaignFile.Save(_navigation.Campaign, _campaignPath);
+        RefreshUi();
+    }
+
     private void ShowCampaignMenuAction(long id)
     {
         if (id == NewRegionalMapMenuId)
@@ -382,15 +454,17 @@ public partial class MapScreen : Control
     private void RefreshUi()
     {
         var current = _navigation.Current;
+        var inPillarDelve = _navigation.Campaign.IsInPillarDelve;
         _localButton.Disabled = current is MapLocation.Local;
         _dungeonButton.Disabled = current is not MapLocation.Local currentLocal ||
                                   !_navigation.Campaign.HasDungeonEntrance(currentLocal.RegionalCoordinate) ||
-                                  !_navigation.Campaign.IsPartyAtDungeonEntrance;
+                                  !_navigation.Campaign.IsPartyAtDungeonEntrance ||
+                                  inPillarDelve;
         var partyTravel = _navigation.Campaign.PartyTravel;
         var viewingPartyLocalMap = current is MapLocation.Local partyLocal && partyLocal.RegionalCoordinate == partyTravel.RegionalCoordinate;
-        _movePartyButton.Disabled = !viewingPartyLocalMap || _mapCanvas?.PreviewLocalPath.Count is not > 1 || partyTravel.RestRequired || _animatingParty;
-        _forcedMarchButton.Disabled = !partyTravel.CanForcedMarch;
-        _restButton.Disabled = false;
+        _movePartyButton.Disabled = inPillarDelve || !viewingPartyLocalMap || _mapCanvas?.PreviewLocalPath.Count is not > 1 || partyTravel.RestRequired || _animatingParty;
+        _forcedMarchButton.Disabled = inPillarDelve || !partyTravel.CanForcedMarch;
+        _restButton.Disabled = inPillarDelve;
         var inRuin = current is MapLocation.Dungeon;
         _moveRuinButton.Disabled = !inRuin;
         _searchRuinButton.Disabled = !inRuin;
@@ -410,6 +484,9 @@ public partial class MapScreen : Control
         };
         var party = _navigation.Campaign.Party;
         _travelLabel.Text = $"Party: {partyTravel.LocalCoordinate} in {partyTravel.RegionalCoordinate} | Day {partyTravel.Day} | {partyTravel.DailyMiles} / {partyTravel.DailyMileLimit} miles | Rations {party.TotalRations} | Exhaustion {party.TotalExhaustion}";
+        _partySummary.Text =
+            $"Terrain { _navigation.Campaign.PartyTerrain } | Coins {_navigation.Campaign.PartyCoins} | Raw Lodestone {_navigation.Campaign.PartyRawLodestone}\n" +
+            $"Daily travel {partyTravel.DailyMiles}/{partyTravel.DailyMileLimit} | Forced march {(partyTravel.ForcedMarchUsed ? "used" : "available after 18 miles")}";
         _partyDetails.Text = string.Join("\n\n", party.Members.Select(member =>
         {
             var conditions = member.Conditions.Count == 0 ? "none" : string.Join(", ", member.Conditions.Order());
@@ -425,7 +502,47 @@ public partial class MapScreen : Control
         _travelLog.Text = _navigation.Campaign.TravelLog.Count == 0
             ? "No travel recorded yet."
             : string.Join("\n", _navigation.Campaign.TravelLog.TakeLast(6).Select(entry => $"Day {entry.Day}: {entry.Message}"));
+        RefreshContextActions(current);
         _mapCanvas?.Refresh();
+    }
+
+    private void RefreshContextActions(MapLocation current)
+    {
+        var atPartyLocal = current is MapLocation.Local local &&
+                           local.RegionalCoordinate == _navigation.Campaign.PartyTravel.RegionalCoordinate;
+        var inPillarDelve = _navigation.Campaign.IsInPillarDelve;
+        var atSettlement = atPartyLocal && _navigation.Campaign.IsPartyOnSettlement;
+        var atPillar = atPartyLocal && _navigation.Campaign.IsPartyOnPillar && !inPillarDelve;
+        var hasContext = atSettlement || atPillar || inPillarDelve;
+
+        _contextTitle.Visible = hasContext;
+        _contextActions.Visible = hasContext;
+        _contextTitle.Text = atSettlement
+            ? "Settlement shop"
+            : inPillarDelve
+                ? "Pillar delve"
+                : atPillar
+                    ? "Pillar work"
+                    : string.Empty;
+
+        _buyRationButton.Visible = atSettlement;
+        _buyRationButton.Disabled = !atSettlement || _navigation.Campaign.PartyCoins < Campaign.RationCoinCost;
+        _refineLodestoneButton.Visible = atSettlement;
+        _refineLodestoneButton.Disabled = !atSettlement || _navigation.Campaign.PartyRawLodestone == 0;
+
+        _gatherLodestoneButton.Visible = atPillar;
+        _gatherLodestoneButton.Disabled = !atPillar;
+        _mineLodestoneButton.Visible = atPillar;
+        _mineLodestoneButton.Disabled = !atPillar || !_navigation.Campaign.PartyHasMiningTools;
+        _enterPillarButton.Visible = atPillar;
+        _enterPillarButton.Disabled = !atPillar;
+
+        _goDeeperPillarButton.Visible = inPillarDelve;
+        _searchPillarButton.Visible = inPillarDelve;
+        _exitPillarButton.Visible = inPillarDelve;
+        _goDeeperPillarButton.Disabled = !inPillarDelve;
+        _searchPillarButton.Disabled = !inPillarDelve;
+        _exitPillarButton.Disabled = !inPillarDelve;
     }
 
     private void SetInspectorText(string text)

@@ -8,6 +8,12 @@ public sealed record LocalCellState(int Q, int R, Terrain Terrain, int? DieRoll)
 
 public sealed record RoamingHazardState(int Q, int R, int DieRoll);
 
+public sealed record LocalMapOverlayState(
+    int ParentColumn,
+    int ParentRow,
+    List<RoamingHazardState>? RoamingHazards = null,
+    int RoamingHazardDay = 0);
+
 public sealed record NamedValueState(string Name, int Value);
 
 public sealed record InventoryItemState(string Name, int Slots, bool IsUniqueOrMagical);
@@ -66,13 +72,19 @@ public sealed record PartyTravelStateState(
 
 public sealed record CampaignState(
     List<RegionalCellState> RegionalCells,
-    List<LocalMapState> LocalMaps,
+    List<LocalMapState>? LocalMaps = null,
     PartyTravelStateState? PartyTravel = null,
     PartyState? Party = null,
-    List<TravelLogEntryState>? TravelLog = null);
+    List<TravelLogEntryState>? TravelLog = null,
+    int? Version = null,
+    int? WorldSeed = null,
+    List<LocalMapOverlayState>? LocalMapOverlays = null,
+    PillarDelveState? PillarDelve = null);
 
 public static class CampaignFile
 {
+    public const int CurrentVersion = 2;
+
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     public static Campaign LoadOrCreate(string path)
@@ -84,20 +96,13 @@ public static class CampaignFile
                 var state = JsonSerializer.Deserialize<CampaignState>(File.ReadAllText(path), JsonOptions);
                 if (state is not null)
                 {
+                    ValidateVersion(state);
                     return new Campaign(state);
                 }
             }
-            catch (JsonException)
+            catch (Exception exception) when (exception is JsonException or InvalidDataException or IOException)
             {
-                // A malformed save is replaced with a new valid campaign.
-            }
-            catch (InvalidDataException)
-            {
-                // A structurally invalid save is replaced with a new valid campaign.
-            }
-            catch (IOException)
-            {
-                // Use a new in-memory campaign if the existing file cannot be read.
+                QuarantineInvalidSave(path, exception);
             }
         }
 
@@ -120,5 +125,53 @@ public static class CampaignFile
         var temporaryPath = path + ".tmp";
         File.WriteAllText(temporaryPath, JsonSerializer.Serialize(campaign.ToState(), JsonOptions));
         File.Move(temporaryPath, path, overwrite: true);
+    }
+
+    private static void ValidateVersion(CampaignState state)
+    {
+        if (state.Version is null)
+        {
+            return;
+        }
+
+        if (state.Version != CurrentVersion)
+        {
+            throw new InvalidDataException($"Unsupported campaign save version {state.Version}; expected {CurrentVersion}.");
+        }
+    }
+
+    private static void QuarantineInvalidSave(string path, Exception exception)
+    {
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        var quarantinePath = CreateQuarantinePath(path);
+        try
+        {
+            File.Move(path, quarantinePath);
+            File.WriteAllText(quarantinePath + ".reason.txt", exception.Message);
+        }
+        catch (Exception quarantineException) when (quarantineException is IOException or UnauthorizedAccessException)
+        {
+            throw new InvalidDataException($"The campaign save at '{path}' is invalid and could not be quarantined.", quarantineException);
+        }
+    }
+
+    private static string CreateQuarantinePath(string path)
+    {
+        var directory = Path.GetDirectoryName(path);
+        var fileName = Path.GetFileName(path);
+        var stamp = DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmssfff");
+        var candidate = Path.Combine(directory ?? string.Empty, $"{fileName}.invalid-{stamp}");
+        var suffix = 1;
+        while (File.Exists(candidate))
+        {
+            candidate = Path.Combine(directory ?? string.Empty, $"{fileName}.invalid-{stamp}-{suffix}");
+            suffix++;
+        }
+
+        return candidate;
     }
 }

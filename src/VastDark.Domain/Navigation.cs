@@ -15,15 +15,23 @@ public sealed class Campaign
 {
     public static readonly RegionalCoord DungeonRegionalCoordinate = new(4, 3);
     public static readonly HexCoord DungeonLocalCoordinate = HexCoord.Zero;
+    public const string CoinResource = "Coins";
+    public const string RawLodestoneItem = "Raw Lodestone";
+    public const int RationCoinCost = 10;
 
     private readonly Dictionary<RegionalCoord, LocalMap> _localMaps = new();
+    private readonly Dictionary<RegionalCoord, LocalMapOverlayState> _localMapOverlays = new();
     private readonly Random _random;
     private readonly List<TravelLogEntryState> _travelLog;
+    private readonly bool _usesDeterministicLocalMaps;
+    private PillarDelve? _pillarDelve;
 
     public Campaign(Random? random = null)
     {
         _random = random ?? Random.Shared;
         Regional = new RegionalMap(_random);
+        WorldSeed = _random.Next();
+        _usesDeterministicLocalMaps = true;
         Dungeon = PrototypeDungeonBuilder.CreateSixLevelDungeon();
         Ruin = new RuinExploration(RuinGenerationRules.RollAndGenerate(new SystemRandomSource(_random)), new GridCoord(0, 0));
         Party = new TravelParty([new Traveler("Expedition")]);
@@ -36,15 +44,32 @@ public sealed class Campaign
         ArgumentNullException.ThrowIfNull(state);
         _random = Random.Shared;
         Regional = new RegionalMap(state.RegionalCells ?? throw new InvalidDataException("The campaign save is missing regional cells."));
+        var hasLegacyFullLocalMaps = state.WorldSeed is null && state.LocalMaps is { Count: > 0 };
+        WorldSeed = hasLegacyFullLocalMaps ? null : state.WorldSeed ?? 0;
+        _usesDeterministicLocalMaps = WorldSeed is not null;
         Dungeon = PrototypeDungeonBuilder.CreateSixLevelDungeon();
         Ruin = new RuinExploration(RuinGenerationRules.RollAndGenerate(new SystemRandomSource(_random)), new GridCoord(0, 0));
 
-        foreach (var localState in state.LocalMaps ?? throw new InvalidDataException("The campaign save is missing local maps."))
+        foreach (var localState in state.LocalMaps ?? [])
         {
             var localMap = new LocalMap(localState);
             if (!Regional.Contains(localMap.Parent) || Regional.GetTerrain(localMap.Parent) != localMap.ParentTerrain || !_localMaps.TryAdd(localMap.Parent, localMap))
             {
                 throw new InvalidDataException("The campaign save contains an invalid local map.");
+            }
+        }
+
+        foreach (var overlay in state.LocalMapOverlays ?? [])
+        {
+            var parent = new RegionalCoord(overlay.ParentColumn, overlay.ParentRow);
+            if (!Regional.Contains(parent) || !_localMapOverlays.TryAdd(parent, overlay))
+            {
+                throw new InvalidDataException("The campaign save contains an invalid local map overlay.");
+            }
+
+            if (_localMaps.TryGetValue(parent, out var localMap))
+            {
+                localMap.ApplyOverlay(overlay, CreateLocalRandom(parent));
             }
         }
 
@@ -77,6 +102,10 @@ public sealed class Campaign
             .Where(entry => entry.Day >= 1 && !string.IsNullOrWhiteSpace(entry.Message))
             .TakeLast(100)
             .ToList();
+        if (state.PillarDelve is not null)
+        {
+            _pillarDelve = new PillarDelve(state.PillarDelve);
+        }
     }
 
     public RegionalMap Regional { get; }
@@ -84,14 +113,36 @@ public sealed class Campaign
     public RuinExploration Ruin { get; }
     public TravelParty Party { get; }
     public PartyTravelState PartyTravel { get; }
+    public int? WorldSeed { get; }
     public IReadOnlyList<TravelLogEntryState> TravelLog => _travelLog;
+    public bool IsInPillarDelve => _pillarDelve is not null;
+    public Terrain PartyTerrain => GetLocalMap(PartyTravel.RegionalCoordinate).GetTerrain(PartyTravel.LocalCoordinate);
+    public bool IsPartyOnSettlement => !IsInPillarDelve && PartyTerrain == Terrain.Settlements;
+    public bool IsPartyOnPillar => PartyTerrain == Terrain.Pillars;
+    public int PartyCoins => Party.Members.Sum(member => member.GetResource(CoinResource));
+    public int PartyRawLodestone => Party.Members.Sum(member => CountInventoryItems(member, RawLodestoneItem));
+    public bool PartyHasMiningTools => Party.Members.Any(HasMiningTools);
 
-    public CampaignState ToState() => new(
-        Regional.ToState().ToList(),
-        _localMaps.Values.Select(map => map.ToState()).ToList(),
-        PartyTravel.ToState(),
-        Party.ToState(),
-        _travelLog.ToList());
+    public CampaignState ToState()
+    {
+        var localMaps = _usesDeterministicLocalMaps
+            ? []
+            : _localMaps.Values.Select(map => map.ToState()).ToList();
+        var overlays = _usesDeterministicLocalMaps
+            ? CreateLocalMapOverlays()
+            : [];
+
+        return new CampaignState(
+            Regional.ToState().ToList(),
+            localMaps,
+            PartyTravel.ToState(),
+            Party.ToState(),
+            _travelLog.ToList(),
+            CampaignFile.CurrentVersion,
+            WorldSeed,
+            overlays,
+            _pillarDelve?.ToState());
+    }
 
     public LocalMap GetLocalMap(RegionalCoord coordinate)
     {
@@ -102,11 +153,47 @@ public sealed class Campaign
 
         if (!_localMaps.TryGetValue(coordinate, out var localMap))
         {
-            localMap = new LocalMap(coordinate, Regional.GetTerrain(coordinate), _random);
+            localMap = new LocalMap(coordinate, Regional.GetTerrain(coordinate), CreateLocalRandom(coordinate));
+            if (_localMapOverlays.TryGetValue(coordinate, out var overlay))
+            {
+                localMap.ApplyOverlay(overlay, CreateLocalRandom(coordinate));
+            }
+
             _localMaps.Add(coordinate, localMap);
         }
 
         return localMap;
+    }
+
+    private Random CreateLocalRandom(RegionalCoord coordinate)
+    {
+        if (!_usesDeterministicLocalMaps || WorldSeed is not { } seed)
+        {
+            return _random;
+        }
+
+        unchecked
+        {
+            var hash = seed;
+            hash = (hash * 397) ^ coordinate.Column;
+            hash = (hash * 397) ^ coordinate.Row;
+            return new Random(hash);
+        }
+    }
+
+    private List<LocalMapOverlayState> CreateLocalMapOverlays()
+    {
+        var overlays = _localMapOverlays.ToDictionary(entry => entry.Key, entry => entry.Value);
+        foreach (var map in _localMaps.Values)
+        {
+            overlays[map.Parent] = map.ToOverlayState();
+        }
+
+        return overlays
+            .OrderBy(entry => entry.Key.Column)
+            .ThenBy(entry => entry.Key.Row)
+            .Select(entry => entry.Value)
+            .ToList();
     }
 
     public bool HasDungeonEntrance(RegionalCoord regionalCoordinate) =>
@@ -258,15 +345,168 @@ public sealed class Campaign
         };
     }
 
+    public TravelInterruptionResolution ResolveTravelInterruption(TravelInterruption interruption, TravelResolutionOptions? options = null)
+    {
+        var resolution = TravelInterruptionResolver.Resolve(interruption, Party, new SystemRandomSource(_random), options);
+        AppendTravelLog(string.Join(" ", resolution.Log));
+        return resolution;
+    }
+
+    public CampaignActionResult TryBuyRationsAtSettlement(int quantity = 1)
+    {
+        if (quantity < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(quantity));
+        }
+
+        if (!IsPartyOnSettlement)
+        {
+            return CampaignActionResult.Blocked("Settlement shop", "The party must be standing on a Settlement subhex to buy supplies.");
+        }
+
+        var market = new SettlementMarket(SettlementScarcity.Middling);
+        var purchase = market.Purchase(RationCoinCost, quantity, supplies: true, offersBarterItem: false);
+        if (!purchase.Purchased)
+        {
+            return CampaignActionResult.Blocked("Settlement shop", purchase.Failure ?? "The settlement rejects the purchase.");
+        }
+
+        if (!TrySpendPartyCoins(purchase.CoinCost))
+        {
+            return CampaignActionResult.Blocked("Settlement shop", $"Buying {purchase.QuantityReceived} ration(s) costs {purchase.CoinCost} coins; the party has {PartyCoins}.");
+        }
+
+        GrantPartyRations(purchase.QuantityReceived);
+        return LogAction(
+            "Settlement shop",
+            $"Bought {purchase.QuantityReceived} ration(s) for {purchase.CoinCost} coins.",
+            $"Party rations: {Party.TotalRations}; coins: {PartyCoins}.");
+    }
+
+    public CampaignActionResult TryRefineRawLodestoneAtSettlement()
+    {
+        if (!IsPartyOnSettlement)
+        {
+            return CampaignActionResult.Blocked("Settlement shop", "Raw Lodestone can be refined only at a Settlement.");
+        }
+
+        var rawAvailable = PartyRawLodestone;
+        if (rawAvailable == 0)
+        {
+            return CampaignActionResult.Blocked("Settlement shop", "The party has no recorded Raw Lodestone.");
+        }
+
+        var random = new SystemRandomSource(_random);
+        var coinsGained = 0;
+        var rawRefined = 0;
+        foreach (var traveler in Party.Members)
+        {
+            var travelerRaw = CountInventoryItems(traveler, RawLodestoneItem);
+            if (travelerRaw == 0)
+            {
+                continue;
+            }
+
+            coinsGained += PillarMiningService.RefineAtSettlement(traveler.Inventory, travelerRaw, random);
+            rawRefined += travelerRaw;
+        }
+
+        AddPartyCoins(coinsGained);
+        return LogAction(
+            "Settlement shop",
+            $"Refined {rawRefined} Raw Lodestone into {coinsGained} coins.",
+            $"Party Raw Lodestone: {PartyRawLodestone}; coins: {PartyCoins}.");
+    }
+
+    public CampaignActionResult TryWorkPillar(PillarWork work)
+    {
+        if (!IsPartyOnPillar || IsInPillarDelve)
+        {
+            return CampaignActionResult.Blocked("Pillar work", "The party must be at a Pillar and outside its tunnels.");
+        }
+
+        var worker = Party.Members
+            .OrderByDescending(member => member.Inventory.AvailableSlots)
+            .ThenBy(member => member.Name, StringComparer.Ordinal)
+            .First();
+        try
+        {
+            var result = PillarMiningService.WorkHour(work, PartyHasMiningTools, worker.Inventory, new SystemRandomSource(_random));
+            return LogAction(
+                "Pillar work",
+                $"{worker.Name} spends 1 hour {work.ToString().ToLowerInvariant()} at the Pillar.",
+                $"Raw Lodestone rolled: {result.RawLodestoneRolled}; collected: {result.RawLodestoneCollected}; encounter roll modifier: +{result.EncounterRollModifier}.",
+                $"Party Raw Lodestone: {PartyRawLodestone}.");
+        }
+        catch (InvalidOperationException exception)
+        {
+            return CampaignActionResult.Blocked("Pillar work", exception.Message);
+        }
+    }
+
+    public CampaignActionResult TryEnterPillarDelve()
+    {
+        if (!IsPartyOnPillar)
+        {
+            return CampaignActionResult.Blocked("Pillar delve", "The party must be standing on Pillars to delve into their tunnels.");
+        }
+
+        _pillarDelve ??= new PillarDelve();
+        return EnterNextPillarTunnel("Pillar delve");
+    }
+
+    public CampaignActionResult TryGoDeeperInPillar()
+    {
+        if (_pillarDelve is null)
+        {
+            return CampaignActionResult.Blocked("Pillar delve", "Enter a Pillar delve before going deeper.");
+        }
+
+        return EnterNextPillarTunnel("Pillar delve");
+    }
+
+    public CampaignActionResult TrySearchPillarTunnel()
+    {
+        if (_pillarDelve is null)
+        {
+            return CampaignActionResult.Blocked("Pillar delve", "Enter a Pillar delve before searching its tunnels.");
+        }
+
+        var random = new SystemRandomSource(_random);
+        var loot = _pillarDelve.RollLoot(random);
+        var eventRule = _pillarDelve.RollEvent(random);
+        return LogAction(
+            "Pillar delve",
+            $"Search takes {PillarDelve.MinutesToSearchTunnel} minutes at tunnel depth {_pillarDelve.Tunnels.Count}.",
+            $"Loot: {loot.Name}. {loot.RuleText}",
+            $"Pressure: {eventRule.Name}. {eventRule.RuleText}");
+    }
+
+    public CampaignActionResult TryExitPillarDelve()
+    {
+        if (_pillarDelve is null)
+        {
+            return CampaignActionResult.Blocked("Pillar delve", "The party is not currently inside a Pillar delve.");
+        }
+
+        var tunnelCount = _pillarDelve.Tunnels.Count;
+        _pillarDelve = null;
+        return LogAction("Pillar delve", $"Exited the Pillar after exploring {tunnelCount} tunnel(s).");
+    }
+
     private PartyMoveResult MoveSucceeded(string message, TravelInterruption? interruption = null)
+    {
+        AppendTravelLog(message);
+        return new PartyMoveResult(true, message, PartyTravel.DailyMiles, PartyTravel.DailyMileLimit, PartyTravel.RestRequired, interruption);
+    }
+
+    private void AppendTravelLog(string message)
     {
         _travelLog.Add(new TravelLogEntryState(PartyTravel.Day, message));
         if (_travelLog.Count > 100)
         {
             _travelLog.RemoveRange(0, _travelLog.Count - 100);
         }
-
-        return new PartyMoveResult(true, message, PartyTravel.DailyMiles, PartyTravel.DailyMileLimit, PartyTravel.RestRequired, interruption);
     }
 
     private HexCoord FindBoundaryEntry(RegionalCoord originRegion, HexCoord originLocal, int direction, RegionalCoord destinationRegion)
@@ -294,6 +534,99 @@ public sealed class Campaign
 
     private static double DistanceSquared((double X, double Y) left, (double X, double Y) right) =>
         (left.X - right.X) * (left.X - right.X) + (left.Y - right.Y) * (left.Y - right.Y);
+
+    private CampaignActionResult EnterNextPillarTunnel(string title)
+    {
+        _pillarDelve ??= new PillarDelve();
+        var tunnel = _pillarDelve.EnterTunnel(new SystemRandomSource(_random));
+        var splitText = tunnel.SplitMarker is null ? string.Empty : $" Split marker: {tunnel.SplitMarker}.";
+        return LogAction(
+            title,
+            $"Moved through a Pillar tunnel for {PillarDelve.MinutesToTravelTunnel} minutes.",
+            $"Depth {tunnel.Depth}: {tunnel.Shape.Name}. {tunnel.Shape.RuleText}{splitText}");
+    }
+
+    private CampaignActionResult LogAction(string title, params string[] messages)
+    {
+        AppendTravelLog(string.Join(" ", messages));
+        return new CampaignActionResult(true, title, messages);
+    }
+
+    private void GrantPartyRations(int amount)
+    {
+        for (var ration = 0; ration < amount; ration++)
+        {
+            var recipient = Party.Members
+                .OrderBy(member => member.Rations)
+                .ThenBy(member => member.Name, StringComparer.Ordinal)
+                .First();
+            recipient.AddRations(1);
+        }
+    }
+
+    private bool TrySpendPartyCoins(int amount)
+    {
+        if (amount < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(amount));
+        }
+
+        if (PartyCoins < amount)
+        {
+            return false;
+        }
+
+        var remaining = amount;
+        foreach (var member in Party.Members.OrderByDescending(member => member.GetResource(CoinResource)).ThenBy(member => member.Name, StringComparer.Ordinal))
+        {
+            var spend = Math.Min(member.GetResource(CoinResource), remaining);
+            if (spend == 0)
+            {
+                continue;
+            }
+
+            member.TryLoseResource(CoinResource, spend);
+            remaining -= spend;
+            if (remaining == 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void AddPartyCoins(int amount)
+    {
+        if (amount < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(amount));
+        }
+
+        var purse = Party.Members[0];
+        purse.SetResource(CoinResource, purse.GetResource(CoinResource) + amount);
+    }
+
+    private static int CountInventoryItems(Traveler traveler, string itemName) =>
+        traveler.Inventory.Items.Count(item => string.Equals(item.Name, itemName, StringComparison.OrdinalIgnoreCase));
+
+    private static bool HasMiningTools(Traveler traveler) =>
+        traveler.Inventory.Items.Any(IsTool) ||
+        traveler.Inventory.Loadouts.Any(loadout => ContainsToolText(loadout.Purpose));
+
+    private static bool IsTool(InventoryItem item) =>
+        ContainsToolText(item.Name);
+
+    private static bool ContainsToolText(string value) =>
+        value.Contains("tool", StringComparison.OrdinalIgnoreCase) ||
+        value.Contains("mining", StringComparison.OrdinalIgnoreCase);
+}
+
+public sealed record CampaignActionResult(bool Applied, string Title, IReadOnlyList<string> Log)
+{
+    public string Summary => string.Join("\n", Log);
+
+    public static CampaignActionResult Blocked(string title, string message) => new(false, title, [message]);
 }
 
 public sealed class MapNavigationService

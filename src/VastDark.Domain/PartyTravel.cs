@@ -109,6 +109,122 @@ public sealed record TravelInterruption(TravelInterruptionKind Kind, Terrain Ter
     };
 }
 
+public sealed record TravelResolutionOptions(
+    bool HasStrongShelter = false,
+    bool RunFromCollapse = true,
+    bool HasExposedMetal = false,
+    bool OnSolidOrRockyGround = false);
+
+public sealed record AppliedDamage(string TravelerName, int Amount, DamageResolution? VitalityResolution);
+
+public sealed record TravelInterruptionResolution(
+    TravelInterruption Interruption,
+    string Title,
+    IReadOnlyList<string> Log,
+    RoamingHazardResolution? Hazard = null,
+    IReadOnlyList<AppliedDamage>? AppliedDamage = null)
+{
+    public string Summary => string.Join(Environment.NewLine, Log);
+}
+
+public static class TravelInterruptionResolver
+{
+    public static TravelInterruptionResolution Resolve(
+        TravelInterruption interruption,
+        TravelParty party,
+        IRandomSource random,
+        TravelResolutionOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(interruption);
+        ArgumentNullException.ThrowIfNull(party);
+        ArgumentNullException.ThrowIfNull(random);
+        options ??= new TravelResolutionOptions();
+
+        return interruption.Kind switch
+        {
+            TravelInterruptionKind.Ruins => new TravelInterruptionResolution(
+                interruption,
+                interruption.Title,
+                ["Travel stops at the Ruins. Enter the generated Ruin graph to explore rooms, encounters, treasure, and depth."],
+                AppliedDamage: []),
+            TravelInterruptionKind.Settlement => new TravelInterruptionResolution(
+                interruption,
+                interruption.Title,
+                ["Travel stops at the Settlement. Resolve rest, resupply, services, factions, and trade before continuing."],
+                AppliedDamage: []),
+            TravelInterruptionKind.RoamingHazard => ResolveRoamingHazard(interruption, party, random, options),
+            _ => throw new InvalidOperationException("Unknown travel interruption kind."),
+        };
+    }
+
+    private static TravelInterruptionResolution ResolveRoamingHazard(
+        TravelInterruption interruption,
+        TravelParty party,
+        IRandomSource random,
+        TravelResolutionOptions options)
+    {
+        if (interruption.HazardDieRoll is not { } dieRoll)
+        {
+            throw new InvalidOperationException("A roaming-hazard interruption requires its d6 face.");
+        }
+
+        var context = new RoamingHazardContext(
+            interruption.Terrain,
+            options.HasStrongShelter,
+            options.RunFromCollapse,
+            options.HasExposedMetal,
+            options.OnSolidOrRockyGround);
+        var hazard = RoamingHazardService.Resolve(dieRoll, party, context, random);
+        var appliedDamage = new List<AppliedDamage>();
+        var log = new List<string> { hazard.Rule.Procedure };
+        var travelersByName = party.Members.ToDictionary(traveler => traveler.Name, StringComparer.OrdinalIgnoreCase);
+
+        if (hazard.CombatantCount is { } combatants)
+        {
+            log.Add($"Combat pending: {combatants} combatant(s).");
+        }
+
+        foreach (var displacement in hazard.Displacements)
+        {
+            log.Add($"{displacement.TravelerName} is displaced 1 mile in direction {displacement.Direction}.");
+        }
+
+        foreach (var hit in hazard.Damage)
+        {
+            if (!travelersByName.TryGetValue(hit.TravelerName, out var traveler))
+            {
+                throw new InvalidOperationException($"Hazard damage references unknown Traveler '{hit.TravelerName}'.");
+            }
+
+            var vitality = traveler.TakeDamage(hit.Amount, random);
+            appliedDamage.Add(new AppliedDamage(hit.TravelerName, hit.Amount, vitality));
+            log.Add($"{hit.TravelerName} takes {hit.Amount} damage.");
+        }
+
+        foreach (var traveler in hazard.ExhaustedTravelers)
+        {
+            log.Add($"{traveler} gains 1 exhaustion.");
+        }
+
+        foreach (var traveler in hazard.CrushedTravelers)
+        {
+            log.Add($"{traveler} is crushed; resolve death or rescue in the encounter layer.");
+        }
+
+        foreach (var traveler in hazard.BreathSaveTravelers)
+        {
+            log.Add($"{traveler} must Save versus Breath.");
+        }
+
+        if (hazard.TerrainReducedToWastes)
+        {
+            log.Add("The terrain may be reduced to Wastes.");
+        }
+
+        return new TravelInterruptionResolution(interruption, interruption.Title, log, hazard, appliedDamage);
+    }
+}
+
 public sealed record PartyMoveResult(bool Moved, string Message, int DailyMiles, int DailyMileLimit, bool RestRequired, TravelInterruption? Interruption = null);
 
 public sealed record PartyRestResult(int FedTravelers, int UnfedTravelers);

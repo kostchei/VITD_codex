@@ -20,6 +20,8 @@ between game sessions.
     local day; a collision or map-edge exit re-drops the marker on an open hex.
 
 The full rules and pseudocode are in [vast-generation.md](vast-generation.md).
+The broader main-text implementation checklist is in
+[RULES_COVERAGE_TODO.md](RULES_COVERAGE_TODO.md).
 
 ## Run
 

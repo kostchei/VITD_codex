@@ -298,6 +298,12 @@ public sealed class LocalMap
         }
     }
 
+    public LocalMap(RegionalCoord parent, Terrain parentTerrain, LocalMapOverlayState overlay, Random? random = null)
+        : this(parent, parentTerrain, random)
+    {
+        ApplyOverlay(overlay, random);
+    }
+
     public RegionalCoord Parent { get; }
     public Terrain ParentTerrain { get; }
     public int DensityRoll { get; }
@@ -343,6 +349,51 @@ public sealed class LocalMap
         RoamingHazardDay++;
     }
 
+    public void ApplyOverlay(LocalMapOverlayState overlay, Random? random = null)
+    {
+        ArgumentNullException.ThrowIfNull(overlay);
+        random ??= Random.Shared;
+        var overlayParent = new RegionalCoord(overlay.ParentColumn, overlay.ParentRow);
+        if (overlayParent != Parent)
+        {
+            throw new InvalidDataException("The local map overlay belongs to a different regional cell.");
+        }
+
+        if (overlay.RoamingHazardDay < 0)
+        {
+            throw new InvalidDataException("The roaming hazard day cannot be negative.");
+        }
+
+        if (overlay.RoamingHazards is null)
+        {
+            RoamingHazardDay = overlay.RoamingHazardDay;
+            return;
+        }
+
+        _roamingHazards.Clear();
+        foreach (var hazardState in overlay.RoamingHazards)
+        {
+            var coordinate = new HexCoord(hazardState.Q, hazardState.R);
+            if (!_cells.Contains(coordinate))
+            {
+                throw new InvalidDataException("The campaign save contains an invalid roaming hazard.");
+            }
+
+            RegionalMap.ValidateDieRoll(hazardState.DieRoll);
+            var target = _visibleCells.Contains(coordinate) && !_roamingHazards.ContainsKey(coordinate)
+                ? coordinate
+                : ChooseUnoccupiedCell(_roamingHazards.Keys.ToHashSet(), random);
+            _roamingHazards.Add(target, hazardState.DieRoll);
+        }
+
+        if (_roamingHazards.Count is < 1 or > 6)
+        {
+            throw new InvalidDataException("A local map must contain between one and six roaming hazards.");
+        }
+
+        RoamingHazardDay = overlay.RoamingHazardDay;
+    }
+
     public static string GetRoamingHazardName(int dieRoll)
     {
         RegionalMap.ValidateDieRoll(dieRoll);
@@ -370,6 +421,12 @@ public sealed class LocalMap
             _terrain[coordinate],
             _diceRolls.TryGetValue(coordinate, out var roll) ? roll : null))
             .ToList(),
+        _roamingHazards.Select(hazard => new RoamingHazardState(hazard.Key.Q, hazard.Key.R, hazard.Value)).ToList(),
+        RoamingHazardDay);
+
+    public LocalMapOverlayState ToOverlayState() => new(
+        Parent.Column,
+        Parent.Row,
         _roamingHazards.Select(hazard => new RoamingHazardState(hazard.Key.Q, hazard.Key.R, hazard.Value)).ToList(),
         RoamingHazardDay);
 

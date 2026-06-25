@@ -2,6 +2,8 @@ namespace VastDark.Domain;
 
 public sealed record PillarTunnelShape(int Roll, string Name, string RuleText);
 public sealed record PillarTunnel(int Depth, int ShapeRoll, PillarTunnelShape Shape, int? SplitMarker = null);
+public sealed record PillarTunnelState(int Depth, int ShapeRoll, int? SplitMarker = null);
+public sealed record PillarDelveState(List<PillarTunnelState> Tunnels);
 public sealed record PillarEventRule(int MinimumRoll, int? MaximumRoll, string Name, string RuleText);
 public sealed record PillarLootRule(int MinimumRoll, int? MaximumRoll, string Name, string RuleText);
 
@@ -11,6 +13,30 @@ public sealed class PillarDelve
     public const int MinutesToTravelTunnel = 10;
     public const int MinutesToSearchTunnel = 30;
     public IReadOnlyList<PillarTunnel> Tunnels => _tunnels;
+
+    public PillarDelve()
+    {
+    }
+
+    public PillarDelve(PillarDelveState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        foreach (var tunnelState in state.Tunnels ?? throw new InvalidDataException("The Pillar delve is missing tunnels."))
+        {
+            if (tunnelState.Depth != _tunnels.Count + 1)
+            {
+                throw new InvalidDataException("The Pillar delve contains an invalid tunnel depth sequence.");
+            }
+
+            var shape = PillarDelvingRules.GetShape(tunnelState.ShapeRoll);
+            if (tunnelState.SplitMarker is < 1 or > 6)
+            {
+                throw new InvalidDataException("The Pillar delve contains an invalid split marker.");
+            }
+
+            _tunnels.Add(new PillarTunnel(tunnelState.Depth, tunnelState.ShapeRoll, shape, tunnelState.SplitMarker));
+        }
+    }
 
     public PillarTunnel EnterTunnel(IRandomSource random)
     {
@@ -25,6 +51,7 @@ public sealed class PillarDelve
 
     public PillarEventRule RollEvent(IRandomSource random) => PillarDelvingRules.GetEvent(random.Next(1, 7) + _tunnels.Count - 1);
     public PillarLootRule RollLoot(IRandomSource random) => PillarDelvingRules.GetLoot(random.Next(1, 7) + _tunnels.Count);
+    public PillarDelveState ToState() => new(_tunnels.Select(tunnel => new PillarTunnelState(tunnel.Depth, tunnel.ShapeRoll, tunnel.SplitMarker)).ToList());
 }
 
 /// <summary>Page 15 tunnel shape, escalating event, and depth-based loot tables.</summary>

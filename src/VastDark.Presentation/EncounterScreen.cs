@@ -42,4 +42,12 @@ public sealed partial class EncounterScreen : Control
         Visible = true;
         MoveToFront();
     }
+
+    public void Present(TravelInterruptionResolution resolution)
+    {
+        _title.Text = resolution.Title;
+        _details.Text = resolution.Summary;
+        Visible = true;
+        MoveToFront();
+    }
 }

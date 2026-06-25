@@ -17,6 +17,10 @@ public partial class MapCanvas : Control
     private static readonly Color RegionalOutline = new("86a9cb");
     private static readonly Color SymbolLine = new("07090d");
     private static readonly Color Selection = new("d6a928");
+    private static readonly Color WastesTexture = new(0.58f, 0.70f, 0.80f, 0.35f);
+    private static readonly Color RuinsTexture = new(0.38f, 0.48f, 0.58f, 0.38f);
+    private static readonly Color PillarsTexture = new(0.08f, 0.13f, 0.20f, 0.32f);
+    private static readonly Color SettlementsTexture = new(0.74f, 0.52f, 0.18f, 0.42f);
     private const float RegionalHexRadius = 39f;
     private const float LocalHexRadius = 42f;
     private const float DungeonTileSize = 25f;
@@ -271,7 +275,7 @@ public partial class MapCanvas : Control
         var worldPoints = CreateFlatTopHex(worldCentre, radius);
         var points = worldPoints.Select(ToScreen).ToArray();
 
-        DrawColoredPolygon(points, TerrainFill(terrain));
+        DrawTerrainPolygon(points, terrain, radius);
         DrawPolygonBorder(worldPoints, GridLine, Math.Max(1f, _zoom));
         DrawTerrainMarker(worldCentre, radius, terrain);
         if (marker is not null)
@@ -300,7 +304,8 @@ public partial class MapCanvas : Control
             return;
         }
 
-        DrawColoredPolygon(clippedPoints.Select(ToScreen).ToArray(), TerrainFill(terrain));
+        var screenPoints = clippedPoints.Select(ToScreen).ToArray();
+        DrawTerrainPolygon(screenPoints, terrain, radius);
         DrawPolygonBorder(clippedPoints, GridLine, Math.Max(1f, _zoom));
         var visibleCentre = VisiblePolygonCentre(clippedPoints);
         if (showTerrainMarker)
@@ -321,17 +326,75 @@ public partial class MapCanvas : Control
     private void DrawRoamingHazard(Vector2 worldCentre, int dieRoll)
     {
         var centre = ToScreen(worldCentre);
-        var radius = 13f * _zoom;
-        DrawCircle(centre, radius, SymbolLine);
-        DrawArc(centre, radius, 0f, Mathf.Tau, 24, Colors.White, Math.Max(1f, _zoom), true);
-        DrawString(
-            ThemeDB.FallbackFont,
-            centre + new Vector2(-5f * _zoom, 5.5f * _zoom),
-            dieRoll.ToString(),
-            HorizontalAlignment.Left,
-            -1f,
-            Mathf.RoundToInt(15f * _zoom),
-            Colors.White);
+        var radius = 14f * _zoom;
+        var inner = radius * 0.58f;
+        var accent = HazardColor(dieRoll);
+        DrawCircle(centre, radius, new Color("0f172a"));
+        DrawArc(centre, radius, 0f, Mathf.Tau, 32, accent, Math.Max(2f, 2.4f * _zoom), true);
+
+        switch (dieRoll)
+        {
+            case 1:
+                DrawLine(centre + new Vector2(-inner, -inner), centre + new Vector2(inner, inner), accent, Math.Max(1.5f, 2f * _zoom), true);
+                DrawLine(centre + new Vector2(inner, -inner), centre + new Vector2(-inner, inner), accent, Math.Max(1.5f, 2f * _zoom), true);
+                DrawLine(centre + new Vector2(-inner * 0.5f, 0f), centre + new Vector2(inner * 0.5f, 0f), accent, Math.Max(1.2f, 1.5f * _zoom), true);
+                break;
+            case 2:
+                var spiral = Enumerable.Range(0, 13)
+                    .Select(index =>
+                    {
+                        var angle = index * 0.75f;
+                        var distance = inner * index / 12f;
+                        return centre + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * distance;
+                    })
+                    .ToArray();
+                DrawPolyline(spiral, accent, Math.Max(1.5f, 2f * _zoom), true);
+                break;
+            case 3:
+                DrawCircle(centre + new Vector2(-inner * 0.42f, -inner * 0.15f), Math.Max(1.8f, 2.5f * _zoom), accent);
+                DrawCircle(centre + new Vector2(inner * 0.35f, -inner * 0.30f), Math.Max(1.8f, 2.5f * _zoom), accent);
+                DrawCircle(centre + new Vector2(-inner * 0.15f, inner * 0.35f), Math.Max(1.8f, 2.5f * _zoom), accent);
+                DrawCircle(centre + new Vector2(inner * 0.25f, inner * 0.15f), Math.Max(1.8f, 3f * _zoom), accent);
+                break;
+            case 4:
+                var rubble = new[]
+                {
+                    centre + new Vector2(0f, -inner),
+                    centre + new Vector2(inner * 0.82f, inner * 0.62f),
+                    centre + new Vector2(-inner * 0.82f, inner * 0.62f),
+                    centre + new Vector2(0f, -inner),
+                };
+                DrawPolyline(rubble, accent, Math.Max(1.5f, 2f * _zoom), true);
+                DrawLine(centre + new Vector2(-inner * 0.40f, inner * 0.22f), centre + new Vector2(inner * 0.40f, inner * 0.22f), accent, Math.Max(1.2f, 1.5f * _zoom), true);
+                break;
+            case 5:
+                var bolt = new[]
+                {
+                    centre + new Vector2(inner * 0.35f, -inner),
+                    centre + new Vector2(-inner * 0.25f, -inner * 0.05f),
+                    centre + new Vector2(inner * 0.18f, -inner * 0.05f),
+                    centre + new Vector2(-inner * 0.25f, inner),
+                };
+                DrawPolyline(bolt, accent, Math.Max(1.5f, 2.2f * _zoom), true);
+                break;
+            case 6:
+                for (var row = -1; row <= 1; row++)
+                {
+                    var y = centre.Y + row * inner * 0.46f;
+                    var wave = Enumerable.Range(0, 7)
+                        .Select(index =>
+                        {
+                            var x = centre.X - inner + inner * 2f * index / 6f;
+                            var offset = Mathf.Sin(index * 1.3f) * 2.5f * _zoom;
+                            return new Vector2(x, y + offset);
+                        })
+                        .ToArray();
+                    DrawPolyline(wave, accent, Math.Max(1.2f, 1.5f * _zoom), true);
+                }
+                break;
+        }
+
+        DrawScreenTextCentered(dieRoll.ToString(), centre, Mathf.RoundToInt(8f * _zoom), Colors.White);
     }
 
     private void DrawPartyMarker(Vector2 worldCentre, float hexRadius)
@@ -434,6 +497,18 @@ public partial class MapCanvas : Control
 
     private void DrawTerrainMarker(Vector2 worldCentre, float hexRadius, Terrain terrain)
     {
+        if (terrain == Terrain.Pillars)
+        {
+            var pillarSize = hexRadius * 0.58f;
+            Vector2 PillarPoint(float x, float y) => ToScreen(worldCentre + new Vector2(x * pillarSize, y * pillarSize));
+            void PillarStroke(params Vector2[] points) => DrawPolyline(points, SymbolLine, Math.Max(1.5f, 2.25f * _zoom), true);
+
+            PillarStroke(PillarPoint(-0.34f, 0.42f), PillarPoint(-0.18f, -0.42f), PillarPoint(-0.02f, 0.42f));
+            PillarStroke(PillarPoint(0.08f, 0.42f), PillarPoint(0.18f, -0.34f), PillarPoint(0.34f, 0.42f));
+            PillarStroke(PillarPoint(-0.44f, 0.42f), PillarPoint(0.44f, 0.42f));
+            return;
+        }
+
         if (terrain is not (Terrain.Ruins or Terrain.Settlements))
         {
             return;
@@ -458,6 +533,93 @@ public partial class MapCanvas : Control
     }
 
     private static float Cross(Vector2 left, Vector2 right) => left.X * right.Y - left.Y * right.X;
+
+    private void DrawTerrainPolygon(Vector2[] screenPoints, Terrain terrain, float radius)
+    {
+        DrawColoredPolygon(screenPoints, TerrainFill(terrain));
+        DrawTerrainTexture(screenPoints, terrain, radius);
+    }
+
+    private void DrawTerrainTexture(Vector2[] points, Terrain terrain, float radius)
+    {
+        var screenRadius = Math.Max(1f, radius * _zoom);
+        var step = Mathf.Clamp(screenRadius / 5.5f, 5f, 14f);
+        var dotRadius = Mathf.Clamp(screenRadius / 46f, 0.65f, 1.9f);
+        switch (terrain)
+        {
+            case Terrain.Wastes:
+                DrawDitheredPolygon(points, WastesTexture, dotRadius, step * 1.15f, TerrainPattern.Dot);
+                break;
+            case Terrain.Ruins:
+                DrawDitheredPolygon(points, RuinsTexture, dotRadius, step, TerrainPattern.Block);
+                break;
+            case Terrain.Pillars:
+                DrawDitheredPolygon(points, PillarsTexture, dotRadius, step * 0.95f, TerrainPattern.Stroke);
+                break;
+            case Terrain.Settlements:
+                DrawDitheredPolygon(points, SettlementsTexture, dotRadius, step, TerrainPattern.Dot);
+                break;
+        }
+    }
+
+    private void DrawDitheredPolygon(Vector2[] points, Color colour, float radius, float step, TerrainPattern pattern)
+    {
+        var minX = points.Min(point => point.X);
+        var maxX = points.Max(point => point.X);
+        var minY = points.Min(point => point.Y);
+        var maxY = points.Max(point => point.Y);
+
+        for (var y = minY; y <= maxY; y += step)
+        {
+            var rowOffset = Mathf.RoundToInt(y / step) % 2 == 0 ? 0f : step * 0.5f;
+            for (var x = minX - rowOffset; x <= maxX; x += step)
+            {
+                var point = new Vector2(x + rowOffset, y);
+                if (!Geometry2D.IsPointInPolygon(point, points))
+                {
+                    continue;
+                }
+
+                switch (pattern)
+                {
+                    case TerrainPattern.Dot:
+                        DrawCircle(point, radius, colour);
+                        break;
+                    case TerrainPattern.Block:
+                        DrawRect(new Rect2(point - Vector2.One * radius, Vector2.One * radius * 2f), colour);
+                        break;
+                    case TerrainPattern.Stroke:
+                        DrawLine(point + new Vector2(0f, -radius * 2f), point + new Vector2(0f, radius * 2f), colour, Math.Max(1f, radius), true);
+                        break;
+                }
+            }
+        }
+    }
+
+    private static Color HazardColor(int dieRoll) => dieRoll switch
+    {
+        1 => new Color("ef4444"),
+        2 => new Color("a855f7"),
+        3 => new Color("22c55e"),
+        4 => new Color("f97316"),
+        5 => new Color("3b82f6"),
+        6 => new Color("eab308"),
+        _ => Colors.White,
+    };
+
+    private void DrawScreenTextCentered(string text, Vector2 centre, int fontSize, Color colour)
+    {
+        var font = ThemeDB.FallbackFont;
+        var size = font.GetStringSize(text, HorizontalAlignment.Left, -1f, fontSize);
+        DrawString(font, centre + new Vector2(-size.X / 2f, size.Y / 3f), text, HorizontalAlignment.Left, -1f, fontSize, colour);
+    }
+
+    private enum TerrainPattern
+    {
+        Dot,
+        Block,
+        Stroke,
+    }
 
     private void SelectAt(Vector2 screenPosition)
     {
