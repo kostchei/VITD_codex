@@ -61,13 +61,19 @@ Codex rules against the extracted main text in
         depth changes to party/campaign state.
   - [ ] Persist Ruin room visit/search state, collapses, shortcuts, and exits.
 
-- [ ] 5. Add a shared encounter/save/combat resolver.
-  - [ ] Centralize save prompts, damage application, combat starts, tribute,
-        trade, mood outcomes, and choice points.
-  - [ ] Use the same resolver for roaming hazards, Wastes encounters, Pillar
-        encounters, Ruin encounters, and Crawl creature specials.
-  - [ ] Record unresolved player/referee choices explicitly instead of hiding
-        them in plain text logs.
+- [~] 5. Add a shared encounter/save/combat resolver.
+  - [x] Centralize save prompts, damage application, combat starts, tribute,
+        trade, mood outcomes, and choice points in `EncounterResolver`
+        (`EncounterResolution.cs`).
+  - [x] Use the same resolver for roaming hazards, Wastes encounters, Pillar
+        encounters, Ruin encounters, and direct Crawl encounters;
+        `TravelInterruptionResolver` now delegates its hazard path to it.
+  - [x] Record unresolved player/referee choices explicitly via the
+        `PendingDecision` hierarchy (saves, combat, tribute via mood, trade,
+        mood, and referee choices) instead of plain log text.
+  - [ ] Migrate the remaining `Campaign` Wastes/Pillar/Ruin encounter call sites
+        and the presentation `EncounterScreen` onto `EncounterResolution` so the
+        UI renders structured decisions rather than the legacy summary string.
 
 - [ ] 6. Treat Deep/Rites/Minotaur as the final campaign layer.
   - [ ] Add a campaign mode for entering the Deep and progressing through trials.

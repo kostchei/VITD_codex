@@ -3,6 +3,7 @@
     ("Map generation", MapGenerationTests.Run),
     ("Traveler rules", TravelerRuleTests.Run),
     ("Rule tables", RuleTableTests.Run),
+    ("Encounter resolver", EncounterResolverTests.Run),
     ("Travel and campaign", TravelCampaignTests.Run),
     ("Persistence", PersistenceTests.Run),
 };

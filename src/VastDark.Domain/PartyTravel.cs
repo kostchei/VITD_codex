@@ -174,54 +174,12 @@ public static class TravelInterruptionResolver
             options.RunFromCollapse,
             options.HasExposedMetal,
             options.OnSolidOrRockyGround);
-        var hazard = RoamingHazardService.Resolve(dieRoll, party, context, random);
-        var appliedDamage = new List<AppliedDamage>();
-        var log = new List<string> { hazard.Rule.Procedure };
-        var travelersByName = party.Members.ToDictionary(traveler => traveler.Name, StringComparer.OrdinalIgnoreCase);
 
-        if (hazard.CombatantCount is { } combatants)
-        {
-            log.Add($"Combat pending: {combatants} combatant(s).");
-        }
-
-        foreach (var displacement in hazard.Displacements)
-        {
-            log.Add($"{displacement.TravelerName} is displaced 1 mile in direction {displacement.Direction}.");
-        }
-
-        foreach (var hit in hazard.Damage)
-        {
-            if (!travelersByName.TryGetValue(hit.TravelerName, out var traveler))
-            {
-                throw new InvalidOperationException($"Hazard damage references unknown Traveler '{hit.TravelerName}'.");
-            }
-
-            var vitality = traveler.TakeDamage(hit.Amount, random);
-            appliedDamage.Add(new AppliedDamage(hit.TravelerName, hit.Amount, vitality));
-            log.Add($"{hit.TravelerName} takes {hit.Amount} damage.");
-        }
-
-        foreach (var traveler in hazard.ExhaustedTravelers)
-        {
-            log.Add($"{traveler} gains 1 exhaustion.");
-        }
-
-        foreach (var traveler in hazard.CrushedTravelers)
-        {
-            log.Add($"{traveler} is crushed; resolve death or rescue in the encounter layer.");
-        }
-
-        foreach (var traveler in hazard.BreathSaveTravelers)
-        {
-            log.Add($"{traveler} must Save versus Breath.");
-        }
-
-        if (hazard.TerrainReducedToWastes)
-        {
-            log.Add("The terrain may be reduced to Wastes.");
-        }
-
-        return new TravelInterruptionResolution(interruption, interruption.Title, log, hazard, appliedDamage);
+        // The shared encounter resolver owns hazard mechanics; the travel layer just re-titles the
+        // outcome and flattens its pending decisions into the legacy interruption summary.
+        var resolution = EncounterResolver.ResolveRoamingHazard(dieRoll, party, context, random);
+        var log = resolution.Log.Concat(resolution.PendingDecisions.Select(decision => decision.Prompt)).ToList();
+        return new TravelInterruptionResolution(interruption, interruption.Title, log, resolution.RoamingHazard, resolution.AppliedDamage);
     }
 }
 
