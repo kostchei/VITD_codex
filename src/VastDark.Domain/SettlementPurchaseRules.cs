@@ -13,6 +13,15 @@ public sealed class SettlementMarket
         }
     }
 
+    /// <summary>Rehydrates a saved market, restoring its remaining limited-inventory purchases.</summary>
+    public SettlementMarket(SettlementScarcity scarcity, int? remainingLimitedPurchases)
+    {
+        Scarcity = scarcity;
+        _remainingLimitedPurchases = scarcity == SettlementScarcity.LimitedInventory
+            ? remainingLimitedPurchases ?? throw new ArgumentNullException(nameof(remainingLimitedPurchases), "Limited inventory settlements require a remaining purchase count.")
+            : null;
+    }
+
     public SettlementScarcity Scarcity { get; }
     public int? RemainingLimitedPurchases => _remainingLimitedPurchases;
 

@@ -5,6 +5,7 @@
     ("Rule tables", RuleTableTests.Run),
     ("Encounter resolver", EncounterResolverTests.Run),
     ("Day resolution", DayResolutionServiceTests.Run),
+    ("Settlement generation", SettlementGenerationTests.Run),
     ("Travel and campaign", TravelCampaignTests.Run),
     ("Persistence", PersistenceTests.Run),
 };

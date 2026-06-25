@@ -205,6 +205,12 @@ internal static class TravelCampaignTests
                         continue;
                     }
 
+                    // Settlements now carry generated scarcity; the purchase-shell test needs a buyable (Middling) market.
+                    if (terrain == Terrain.Settlements && campaign.GetSettlement(region, cell).Scarcity != SettlementScarcity.Middling)
+                    {
+                        continue;
+                    }
+
                     var state = campaign.ToState() with
                     {
                         Party = new PartyState([traveler.ToState()]),

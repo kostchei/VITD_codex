@@ -29,6 +29,10 @@ public static class SettlementGenerationRules
     public static SettlementPopulationRule GetPopulation(int roll) => Populations.FirstOrDefault(rule => roll >= rule.MinimumRoll && roll <= rule.MaximumRoll) ?? throw new ArgumentOutOfRangeException(nameof(roll));
     public static SettlementScarcityRule GetScarcity(int roll) => Scarcities.TryGetValue(roll, out var scarcity) ? scarcity : throw new ArgumentOutOfRangeException(nameof(roll));
     public static SettlementAtmosphereRule GetAtmosphere(int roll) => Atmospheres.TryGetValue(roll, out var atmosphere) ? atmosphere : throw new ArgumentOutOfRangeException(nameof(roll));
+
+    public static SettlementPopulationRule GetPopulationRule(SettlementPopulation population) => Populations.Single(rule => rule.Population == population);
+    public static SettlementScarcityRule GetScarcityRule(SettlementScarcity scarcity) => Scarcities.Values.Single(rule => rule.Scarcity == scarcity);
+    public static SettlementAtmosphereRule GetAtmosphereRule(SettlementAtmosphere atmosphere) => Atmospheres.Values.Single(rule => rule.Atmosphere == atmosphere);
     public static GeneratedSettlement Generate(IRandomSource random)
     {
         ArgumentNullException.ThrowIfNull(random);

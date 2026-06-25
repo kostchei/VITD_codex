@@ -21,6 +21,7 @@ public sealed class Campaign
 
     private readonly Dictionary<RegionalCoord, LocalMap> _localMaps = new();
     private readonly Dictionary<RegionalCoord, LocalMapOverlayState> _localMapOverlays = new();
+    private readonly Dictionary<(RegionalCoord Region, HexCoord Local), Settlement> _settlements = new();
     private readonly Random _random;
     private readonly List<TravelLogEntryState> _travelLog;
     private readonly bool _usesDeterministicLocalMaps;
@@ -71,6 +72,12 @@ public sealed class Campaign
             {
                 localMap.ApplyOverlay(overlay, CreateLocalRandom(parent));
             }
+        }
+
+        foreach (var settlementState in state.Settlements ?? [])
+        {
+            var settlement = Settlement.FromState(settlementState);
+            _settlements[(settlement.Region, settlement.Local)] = settlement;
         }
 
         var legacyTravelState = state.PartyTravel;
@@ -141,7 +148,8 @@ public sealed class Campaign
             CampaignFile.CurrentVersion,
             WorldSeed,
             overlays,
-            _pillarDelve?.ToState());
+            _pillarDelve?.ToState(),
+            _settlements.Values.Select(settlement => settlement.ToState()).ToList());
     }
 
     public LocalMap GetLocalMap(RegionalCoord coordinate)
@@ -178,6 +186,43 @@ public sealed class Campaign
             hash = (hash * 397) ^ coordinate.Column;
             hash = (hash * 397) ^ coordinate.Row;
             return new Random(hash);
+        }
+    }
+
+    /// <summary>The settlement at the party's current cell, generated and cached on first access, or null if the party is not on one.</summary>
+    public Settlement? PartySettlement => IsPartyOnSettlement
+        ? GetSettlement(PartyTravel.RegionalCoordinate, PartyTravel.LocalCoordinate)
+        : null;
+
+    /// <summary>Returns the settlement for a local cell, generating and caching it deterministically on first discovery.</summary>
+    public Settlement GetSettlement(RegionalCoord region, HexCoord local)
+    {
+        var key = (region, local);
+        if (!_settlements.TryGetValue(key, out var settlement))
+        {
+            settlement = Settlement.Generate(region, local, CreateSettlementRandom(region, local));
+            _settlements[key] = settlement;
+        }
+
+        return settlement;
+    }
+
+    private IRandomSource CreateSettlementRandom(RegionalCoord region, HexCoord local)
+    {
+        if (!_usesDeterministicLocalMaps || WorldSeed is not { } seed)
+        {
+            return new SystemRandomSource(_random);
+        }
+
+        unchecked
+        {
+            var hash = seed;
+            hash = (hash * 397) ^ region.Column;
+            hash = (hash * 397) ^ region.Row;
+            hash = (hash * 397) ^ local.Q;
+            hash = (hash * 397) ^ local.R;
+            hash = (hash * 397) ^ 0x5E771E; // Settlement salt: keep this stream distinct from local-map generation.
+            return new SystemRandomSource(new Random(hash));
         }
     }
 
@@ -377,16 +422,15 @@ public sealed class Campaign
             throw new ArgumentOutOfRangeException(nameof(quantity));
         }
 
-        if (!IsPartyOnSettlement)
+        if (PartySettlement is not { } settlement)
         {
             return CampaignActionResult.Blocked("Settlement shop", "The party must be standing on a Settlement subhex to buy supplies.");
         }
 
-        var market = new SettlementMarket(SettlementScarcity.Middling);
-        var purchase = market.Purchase(RationCoinCost, quantity, supplies: true, offersBarterItem: false);
+        var purchase = settlement.Market.Purchase(RationCoinCost, quantity, supplies: true, offersBarterItem: false);
         if (!purchase.Purchased)
         {
-            return CampaignActionResult.Blocked("Settlement shop", purchase.Failure ?? "The settlement rejects the purchase.");
+            return CampaignActionResult.Blocked($"{settlement.Scarcity} settlement", purchase.Failure ?? "The settlement rejects the purchase.");
         }
 
         if (!TrySpendPartyCoins(purchase.CoinCost))

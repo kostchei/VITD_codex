@@ -51,11 +51,16 @@ Codex rules against the extracted main text in
         applied to Travelers; Breath saves and buried Travelers are recorded as
         explicit pending decisions instead of silent reports.
 
-- [ ] 3. Add persistent settlement generation and services.
-  - [ ] Generate and save settlement population, scarcity, atmosphere, locations,
-        factions, and denizens per discovered settlement local cell.
-  - [ ] Replace the generic `Middling` shop shell with the settlement's actual
-        scarcity and remaining purchase limits.
+- [~] 3. Add persistent settlement generation and services.
+  - [~] The `Settlement` type generates and saves population, scarcity, and
+        atmosphere deterministically per discovered settlement local cell
+        (`Campaign.GetSettlement`/`PartySettlement`, persisted in `CampaignState`).
+        Locations, factions, and denizens are not yet generated/persisted per
+        cell (their rule tables exist but are not bound to a settlement instance).
+  - [x] Replace the generic `Middling` shop shell with the settlement's actual
+        scarcity and remaining purchase limits; `TryBuyRationsAtSettlement` now
+        uses the persisted `Settlement.Market`, so Desperate/Steep/Limited
+        scarcities apply and limited stock draws down across visits.
   - [ ] Wire rest, recovery, barter, Raw Lodestone services, faction abilities,
         and denizen obligations into campaign state.
 

@@ -16,6 +16,16 @@ public sealed record LocalMapOverlayState(
 
 public sealed record NamedValueState(string Name, int Value);
 
+public sealed record SettlementState(
+    int ParentColumn,
+    int ParentRow,
+    int LocalQ,
+    int LocalR,
+    SettlementPopulation Population,
+    SettlementScarcity Scarcity,
+    SettlementAtmosphere Atmosphere,
+    int? RemainingLimitedPurchases);
+
 public sealed record InventoryItemState(string Name, int Slots, bool IsUniqueOrMagical);
 public sealed record LoadoutState(string Purpose, int Slots);
 public sealed record TravelerRulesState(
@@ -79,7 +89,8 @@ public sealed record CampaignState(
     int? Version = null,
     int? WorldSeed = null,
     List<LocalMapOverlayState>? LocalMapOverlays = null,
-    PillarDelveState? PillarDelve = null);
+    PillarDelveState? PillarDelve = null,
+    List<SettlementState>? Settlements = null);
 
 public static class CampaignFile
 {
