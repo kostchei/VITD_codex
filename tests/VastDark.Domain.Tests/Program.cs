@@ -6,6 +6,7 @@
     ("Encounter resolver", EncounterResolverTests.Run),
     ("Day resolution", DayResolutionServiceTests.Run),
     ("Settlement generation", SettlementGenerationTests.Run),
+    ("Check and save resolver", CheckResolverTests.Run),
     ("Travel and campaign", TravelCampaignTests.Run),
     ("Persistence", PersistenceTests.Run),
 };
