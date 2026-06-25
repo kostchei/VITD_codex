@@ -20,20 +20,24 @@ Codex rules against the extracted main text in
 
 ## Suggested Order
 
-- [ ] 1. Fill `RuleTableTests` with page-by-page table assertions.
-  - [ ] Pages 6-8: Traveler quirks, inventory/vitality/exhaustion, Harrowing.
-  - [ ] Pages 9-12: navigation assets/lost effects, Wastes weather, encounters,
+- [~] 1. Fill `RuleTableTests` with page-by-page table assertions.
+  - [~] Pages 6-8: Traveler quirks asserted in `RuleTableTests`; inventory,
+        vitality/exhaustion, and Harrowing remain covered by `TravelerRuleTests`
+        rather than the table guardrail.
+  - [x] Pages 9-12: navigation assets/lost effects, Wastes weather, encounters,
         curiosities, and roaming hazards.
-  - [ ] Pages 13-15: Wastes factions, Pillar work, encounters, delves, events,
+  - [x] Pages 13-15: Wastes factions, Pillar work, encounters, delves, events,
         and loot.
-  - [ ] Pages 16-19: settlement generation, scarcity, services, denizens, and
+  - [x] Pages 16-19: settlement generation, scarcity, services, denizens, and
         settlement factions.
-  - [ ] Pages 20-31: Ruin generation, rooms, effects, features, discoveries,
-        encounters, creature stats, and treasure.
-  - [ ] Pages 32-41: Deep gifts, Minotaur, trials, escape ritual, Rites, spells,
-        and Crawl statblocks.
-  - [ ] Add explicit tests for known OCR/text cleanup risks such as broken
-        multiplication signs, smart quotes, and merged headings.
+  - [x] Pages 20-31: Ruin rooms (absent 32, duplicate 45), room effects with
+        saves/damage, features (absent 24, duplicate 25), discoveries,
+        encounters/stat blocks, and depth-banded treasure.
+  - [x] Pages 32-41: Deep gifts, Minotaur and Touch effects, trials, escape
+        ritual ordering, Rite ledger, Rite spells/schools, and Crawl statblocks.
+  - [x] Add explicit tests for known OCR/text cleanup risks such as broken
+        multiplication signs, smart quotes, and merged headings
+        (`TextStaysFreeOfOcrArtifacts`).
 
 - [ ] 2. Build the daily travel/day-resolution engine.
   - [ ] Resolve a route/day using navigation, weather, encounters, rations,

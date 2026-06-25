@@ -10,6 +10,9 @@ internal static class RuleTableTests
         WastesEncountersAndFactionsMatchPages12To13();
         PillarTablesMatchPages14To15();
         SettlementTablesMatchPages16To19();
+        RuinTablesMatchPages20To31();
+        DeepRitesAndCrawlMatchPages32To41();
+        TextStaysFreeOfOcrArtifacts();
     }
 
     private static void TravelerQuirksMatchPage6()
@@ -178,6 +181,174 @@ internal static class RuleTableTests
             "Page 19 settlement faction names changed.");
         Assert(SettlementDenizenRules.GetFaction(SettlementFaction.SeekerKeepers).Ability.Contains("poor common tool", StringComparison.Ordinal), "Seeker Keepers ability must produce poor common tools.");
         Assert(SettlementDenizenRules.GetFaction(SettlementFaction.BlackHelms).Ability.Contains("memory lost", StringComparison.Ordinal), "Black Helms ability must key off memory loss.");
+    }
+
+    private static void RuinTablesMatchPages20To31()
+    {
+        // Pages 22-27 room registry: the printed grid omits 32 and prints 45 twice.
+        Assert(RuinRoomRegistry.Get(1, 1).Single().Name == "Plaza", "Ruin room 11 must be Plaza.");
+        Assert(RuinRoomRegistry.Get(6, 6).Single().Name == "Observatory", "Ruin room 66 must be Observatory.");
+        Assert(RuinRoomRegistry.Get(3, 2).Count == 0, "Ruin room code 32 is absent from the printed table and must stay empty.");
+        AssertNames(
+            RuinRoomRegistry.Get(4, 5).Select(room => room.Name),
+            ["Reliquary", "Fountain"],
+            "Ruin room code 45 must preserve both printed entries.");
+        AssertThrows<ArgumentOutOfRangeException>(() => RuinRoomRegistry.Get(0, 1), "Ruin room rolls below 1 must be invalid.");
+        AssertThrows<ArgumentOutOfRangeException>(() => RuinRoomRegistry.Get(1, 7), "Ruin room rolls above 6 must be invalid.");
+
+        // Room effect procedures (saves/damage) must survive transcription.
+        Assert(RuinRoomEffectRules.Get(45, "Reliquary").Count == 1 && RuinRoomEffectRules.Get(45, "Fountain").Count == 1, "Code 45 must resolve Reliquary and Fountain effects independently.");
+        Assert(RuinRoomEffectRules.Get(15, "Oubliette").Single() is { Save: "Breath", Damage: "1d6×10 fall" }, "Oubliette must require a Breath save and a 1d6×10 fall.");
+        Assert(RuinRoomEffectRules.Get(13, "Archive").Single().Damage == "10d6", "Archive domino must keep its 10d6 damage.");
+        Assert(RuinRoomEffectRules.Get(63, "Quarry").Single() is { Save: "Breath", Damage: "5d6" }, "Quarry crossing must keep its Breath save and 5d6 damage.");
+
+        // Page 28 features: the printed table duplicates 25 and omits 24.
+        Assert(RuinFeatureRules.Get(1).Single().Name == "Warning", "Feature 1 must be Warning.");
+        Assert(RuinFeatureRules.Get(24).Count == 0, "Feature code 24 is absent from the printed table and must stay empty.");
+        AssertNames(
+            RuinFeatureRules.Get(25).Select(feature => feature.Name),
+            ["Vein of Metal", "Hideout"],
+            "Feature code 25 must preserve both printed entries.");
+        Assert(RuinFeatureRules.Get(16).Single().Name == "Stairs Down", "Feature 16 must be Stairs Down.");
+        Assert(RuinFeatureRules.Get(40).Single().Name == "Entrance to the Deep", "Feature 31+ (depth-adjusted) must remain Entrance to the Deep.");
+        AssertThrows<ArgumentOutOfRangeException>(() => RuinFeatureRules.Get(0), "Feature totals below 1 must be invalid.");
+
+        // Page 29 discoveries.
+        AssertNames(
+            Enumerable.Range(1, 6).Select(roll => RuinDiscoveryRules.Get(roll).Name),
+            ["Inscrutable Art", "Esoteric Records", "Curious Currency", "Lost Architecture", "Lost Habitation", "Dangerous Artifact"],
+            "Page 29 discovery table changed.");
+        Assert(RuinDiscoveryRules.Get(6).Effect.Contains("Great and Terrible", StringComparison.Ordinal), "Dangerous Artifact must reference Something Great and Terrible.");
+        AssertThrows<ArgumentOutOfRangeException>(() => RuinDiscoveryRules.Get(7), "Discovery rolls above 6 must be invalid.");
+
+        // Page 30 encounters (1d12 + depth) and stat blocks.
+        Assert(RuinEncounterRules.Get(1).Name == "Nothing", "Ruin encounter 1-5 must be Nothing.");
+        Assert(RuinEncounterRules.Get(6).Name == "Lost Travelers", "Ruin encounter 6 must be Lost Travelers.");
+        Assert(RuinEncounterRules.Get(22).Name == "Wyrm" && RuinEncounterRules.Get(30).Name == "Wyrm", "Ruin encounter 22+ must remain Wyrm.");
+        Assert(RuinEncounterRules.GetMood("Bandits", 3).Name == "Tribute", "Ruin Bandit mood 3 must be Tribute.");
+        Assert(RuinEncounterRules.GetMood("Delvers", 6).Name == "Helpful", "Ruin Delver mood 6 must be Helpful.");
+        Assert(RuinEncounterRules.GetStatBlock("Delvers") is { HitDice: 5, HitPoints: 20 }, "Delver stat block must remain 5 HD / 20 HP.");
+        AssertThrows<ArgumentOutOfRangeException>(() => RuinEncounterRules.Get(0), "Ruin encounter totals below 1 must be invalid.");
+
+        // Page 31 treasures: depth-banded magnitude and category contents.
+        Assert(RuinTreasureRules.GetMagnitude(10) == RuinTreasureMagnitude.Useful, "Treasure totals 1-10 must be Useful.");
+        Assert(RuinTreasureRules.GetMagnitude(11) == RuinTreasureMagnitude.Special && RuinTreasureRules.GetMagnitude(19) == RuinTreasureMagnitude.Special, "Treasure totals 11-19 must be Special.");
+        Assert(RuinTreasureRules.GetMagnitude(20) == RuinTreasureMagnitude.GreatAndTerrible, "Treasure totals 20+ must be Great and Terrible.");
+        AssertThrows<ArgumentOutOfRangeException>(() => RuinTreasureRules.GetMagnitude(0), "Treasure totals below 1 must be invalid.");
+        Assert(RuinTreasureRules.Get(RuinTreasureMagnitude.Useful, 2).Name == "Spell Eater", "Useful treasure 2 must be Spell Eater.");
+        Assert(RuinTreasureRules.Get(RuinTreasureMagnitude.GreatAndTerrible, 10).Name == "Commune", "Great and Terrible treasure 10 must be Commune.");
+        Assert(Enumerable.Range(1, 12).All(roll => RuinTreasureRules.Get(RuinTreasureMagnitude.Useful, roll) is not null), "Useful treasures must cover rolls 1-12.");
+        Assert(Enumerable.Range(1, 12).All(roll => RuinTreasureRules.Get(RuinTreasureMagnitude.Special, roll) is not null), "Special treasures must cover rolls 1-12.");
+        Assert(Enumerable.Range(1, 10).All(roll => RuinTreasureRules.Get(RuinTreasureMagnitude.GreatAndTerrible, roll) is not null), "Great and Terrible treasures must cover rolls 1-10.");
+        AssertThrows<ArgumentOutOfRangeException>(() => RuinTreasureRules.Get(RuinTreasureMagnitude.GreatAndTerrible, 11), "Great and Terrible treasures stop at roll 10.");
+    }
+
+    private static void DeepRitesAndCrawlMatchPages32To41()
+    {
+        // Page 32 Gifts of the Deep.
+        AssertNames(
+            Enumerable.Range(1, 10).Select(roll => DeepGiftRules.Get(roll).Gift.ToString()),
+            ["Torpor", "VoiceOfTheCrawl", "GraftedLimbs", "GiftOfTheCyclops", "TasteForFlesh", "VoidOfPresence", "LodestoneHunger", "UnhollowCannibal", "Melder", "GravitySpider"],
+            "Page 32 Gifts of the Deep table changed.");
+        Assert(DeepGiftRules.Get(3).OncePerDay && DeepGiftRules.Get(6).OncePerDay, "Grafted Limbs and Void of Presence must remain once-per-day gifts.");
+        Assert(!DeepGiftRules.Get(1).OncePerDay, "Torpor must not be once-per-day.");
+        AssertThrows<ArgumentOutOfRangeException>(() => DeepGiftRules.Get(11), "Gift rolls above 10 must be invalid.");
+
+        // Page 33 Minotaur and Touch effects.
+        Assert(MinotaurRules.StatBlock is { HitDice: 20, Attack: "Touch of the Minotaur" }, "Minotaur stat block changed.");
+        Assert(MinotaurRules.ResolveTouch(1, new ScriptedRandom(4)).Effect == MinotaurTouchEffect.WitherTools, "Minotaur touch 1 must wither tools.");
+        Assert(MinotaurRules.ResolveTouch(5, new ScriptedRandom(2)) is { Effect: MinotaurTouchEffect.DrinkFlesh, Permanent: true }, "Minotaur touch 5 must permanently drink Flesh.");
+        Assert(MinotaurRules.ResolveTouch(6, new ScriptedRandom()).MemoryLost, "Minotaur touch 6 must devour a memory.");
+        AssertThrows<ArgumentOutOfRangeException>(() => MinotaurRules.ResolveTouch(7, new ScriptedRandom()), "Minotaur touch rolls above 6 must be invalid.");
+
+        // Pages 34-35 trials.
+        AssertNames(
+            Enum.GetValues<DeepTrial>().Select(trial => DeepTrialRules.Get(trial).Trial.ToString()),
+            ["Scale", "Repetition", "Change", "Emptiness", "Sacrifice", "Lies"],
+            "Pages 34-35 trial set changed.");
+        Assert(DeepTrialRules.Get(DeepTrial.Emptiness).Danger.Contains("No gravity", StringComparison.Ordinal), "Emptiness trial must keep its no-gravity danger.");
+        Assert(DeepTrialRules.Get(DeepTrial.Scale).WayOut.Contains("original entry", StringComparison.Ordinal), "Scale trial way-out text changed.");
+
+        // Page 37 Leaving the Vast ritual must enforce its source ordering.
+        var ritual = new EscapeTheVastRitual();
+        Assert(ThrowsInvalidOperation(() => ritual.SearchCannyClearBenign()), "The ritual must reject steps taken out of order.");
+        ritual.SeekLushMendedFamiliar();
+        ritual.SearchCannyClearBenign();
+        ritual.HideSpotOutsideSenses();
+        ritual.SpeakWishToLeaveTheVast();
+        Assert(ritual.FallForward() == VastTerminalOutcome.EscapedHome, "Completing the ritual sequence must escape home.");
+
+        // Page 38 Rite ledger.
+        var ledger = new RiteLedger();
+        Assert(ledger.GainFromMotion("ruin-entrance") && !ledger.GainFromMotion("ruin-entrance"), "Motions of the Labyrinth must reward a location only once.");
+        Assert(ThrowsInvalidOperation(() => ledger.GainFromShunningLight(false)), "Shunning Light must require a sacrifice.");
+        ledger.GainFromErosionOfSelf();
+        Assert(ledger.LockedErosionExhaustion == 1, "Erosion of Self must lock one exhaustion.");
+        Assert(ledger.TrySpendToCast() && !new RiteLedger().TrySpendToCast(), "Casting must spend an available Rite and fail with none.");
+
+        // Pages 38-39 rite spells and their schools.
+        Assert(Enum.GetValues<RiteSpell>().Length == 15, "There must remain 15 rites across the four schools.");
+        Assert(Enum.GetValues<RiteSpell>().Count(spell => RiteSpellRules.Get(spell).School == RiteSchool.Labyrinth) == 4, "Labyrinth must hold four rites.");
+        Assert(Enum.GetValues<RiteSpell>().Count(spell => RiteSpellRules.Get(spell).School == RiteSchool.Sparks) == 3, "Sparks must hold three rites.");
+        Assert(!RiteSpellRules.Get(RiteSpell.Cinderhowl).CostsRite && !RiteSpellRules.Get(RiteSpell.BrightHand).CostsRite, "Spark rites are free-cast and must not cost a Rite.");
+        Assert(RiteSpellRules.Get(RiteSpell.WildSeeking).CostsRite, "Non-Spark rites must cost a Rite.");
+        Assert(RiteSpellRules.FickleDescentLevels(3, 2, true) == 2 && RiteSpellRules.FickleDescentLevels(3, 2, false) == -2, "Fickle Descent must ascend on face and descend on tail.");
+        AssertThrows<ArgumentOutOfRangeException>(() => RiteSpellRules.FickleDescentLevels(3, 4, true), "Fickle Descent cannot exceed caster level.");
+        Assert(RiteSpellRules.SunderDurationSeconds(2) == 12, "Sunder to Dust must last six seconds per level.");
+
+        // Pages 40-41 Crawl creatures.
+        AssertNames(
+            Enum.GetValues<CrawlCreature>().Select(creature => CrawlCreatureRules.Get(creature).Creature.ToString()),
+            ["Cyclops", "Medusa", "Harpy", "Griffon", "Siren", "Centaur", "Hydra", "Shade", "Ogre", "Wyrm"],
+            "Pages 40-41 Crawl roster changed.");
+        Assert(CrawlCreatureRules.Get(CrawlCreature.Wyrm) is { HitDice: 15, HitPoints: 150 }, "Wyrm stat block must remain 15 HD / 150 HP.");
+        Assert(CrawlCreatureRules.Get(CrawlCreature.Cyclops) is { HitDice: 2, HitPoints: 10 }, "Cyclops stat block must remain 2 HD / 10 HP.");
+        Assert(CrawlCreatureRules.CyclopsCallsAlly(new ScriptedRandom(1)), "Cyclops Call must trigger on a rolled 1.");
+        Assert(CrawlCreatureRules.MedusaScream(charmSaveSucceeded: true) == (false, true), "A successful Medusa save must avoid stun and grant future advantage.");
+        Assert(CrawlCreatureRules.GriffonSwallows(15, holdSaveSucceeded: false), "Griffon must swallow at 15 devour damage on a failed Hold save.");
+        Assert(CrawlCreatureRules.WyrmHowl(breathSaveSucceeded: true, new ScriptedRandom(2, 2, 2)) == (3, false, 0), "A successful Wyrm Howl save must halve damage and avoid deafness.");
+    }
+
+    private static void TextStaysFreeOfOcrArtifacts()
+    {
+        var procedures = RuinRoomEffectRules.All
+            .SelectMany(rule => new[] { rule.RoomName, rule.Procedure, rule.Save, rule.Damage })
+            .Concat(Enumerable.Range(1, 31).SelectMany(total => RuinFeatureRules.Get(total)).SelectMany(feature => new[] { feature.Name, feature.Effect }))
+            .Concat(Enumerable.Range(1, 6).Select(roll => RuinDiscoveryRules.Get(roll).Effect))
+            .Concat(Enumerable.Range(1, 22).Select(total => RuinEncounterRules.Get(total).Description))
+            .Concat(Enumerable.Range(1, 12).Select(roll => RuinTreasureRules.Get(RuinTreasureMagnitude.Useful, roll).Effect))
+            .Concat(Enumerable.Range(1, 12).Select(roll => RuinTreasureRules.Get(RuinTreasureMagnitude.Special, roll).Effect))
+            .Concat(Enumerable.Range(1, 10).Select(roll => RuinTreasureRules.Get(RuinTreasureMagnitude.GreatAndTerrible, roll).Effect))
+            .Concat(Enumerable.Range(1, 10).Select(roll => DeepGiftRules.Get(roll).Effect))
+            .Concat(Enum.GetValues<CrawlCreature>().Select(creature => CrawlCreatureRules.Get(creature).Special))
+            .Concat(Enum.GetValues<RiteSpell>().Select(spell => RiteSpellRules.Get(spell).Effect))
+            .Where(text => text is not null)
+            .Select(text => text!)
+            .ToArray();
+
+        // The source uses '×' for dice multiplication (e.g. 1d6×10). OCR commonly turns this into 'x' or '*'.
+        Assert(procedures.Any(text => text.Contains('×')), "At least one rule must retain a real multiplication sign, confirming the guard is wired to live data.");
+        foreach (var text in procedures)
+        {
+            for (var index = 1; index < text.Length - 1; index++)
+            {
+                var isFakeMultiplier = (text[index] is 'x' or 'X' or '*') && char.IsDigit(text[index - 1]) && char.IsDigit(text[index + 1]);
+                Assert(!isFakeMultiplier, $"Suspected OCR-broken multiplication sign in: '{text}'.");
+            }
+
+            Assert(!text.Any(character => character is '‘' or '’' or '“' or '”'), $"Smart quotes must be normalized to straight quotes in: '{text}'.");
+        }
+
+        // Merged-heading guard: a name field that absorbed body text would gain a colon or grow oversized.
+        var names = Enumerable.Range(1, 6)
+            .SelectMany(first => Enumerable.Range(1, 6).SelectMany(second => RuinRoomRegistry.Get(first, second)))
+            .Select(room => room.Name)
+            .Concat(Enumerable.Range(1, 31).SelectMany(total => RuinFeatureRules.Get(total)).Select(feature => feature.Name))
+            .ToArray();
+        foreach (var name in names)
+        {
+            Assert(!name.Contains(':') && name.Length is > 0 and < 40, $"Suspected merged heading in name: '{name}'.");
+        }
     }
 
     private static void AssertNames(IEnumerable<string> actual, IReadOnlyList<string> expected, string message)
