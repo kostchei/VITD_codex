@@ -311,17 +311,35 @@ public sealed class Campaign
     public PartyMoveResult TryRestParty()
     {
         var localMap = GetLocalMap(PartyTravel.RegionalCoordinate);
-        var terrainEvent = TerrainDayEventService.ResolveDay(localMap.GetTerrain(PartyTravel.LocalCoordinate), Party, new SystemRandomSource(_random));
+        var terrain = localMap.GetTerrain(PartyTravel.LocalCoordinate);
+
+        // The day-resolution engine runs the navigation roll and (in the Wastes) the weather
+        // checkpoint and its weather-modified encounter, applying weather damage to the party.
+        // Navigation assets are not yet tracked on Travelers, so none are supplied here.
+        var day = DayResolutionService.ResolveDay(terrain, Party, [], new WastesWeatherContext(), new SystemRandomSource(_random));
         var restResult = PartyTravel.Rest(Party);
         foreach (var traveler in Party.Members)
         {
             traveler.RecoverGritAfterRest(fullDayOfRest: true, new SystemRandomSource(_random));
         }
         localMap.AdvanceRoamingHazards(_random);
+
+        // Persist the day's resolved outcomes as their own travel-log entries before the rest summary.
+        foreach (var line in day.Log)
+        {
+            AppendTravelLog(line);
+        }
+        foreach (var decision in day.PendingDecisions)
+        {
+            AppendTravelLog(decision.Prompt);
+        }
+
         var rationMessage = restResult.UnfedTravelers == 0
             ? $"The party rests and consumes {restResult.FedTravelers} ration(s)."
             : $"The party rests: {restResult.FedTravelers} ration(s) consumed; {restResult.UnfedTravelers} member(s) gain 1 exhaustion from hunger.";
-        var terrainMessage = terrainEvent.Weather is null ? string.Empty : $" Wastes day: {terrainEvent.Weather.Rule.Name}; encounter: {terrainEvent.Encounter!.Name}.";
+        var terrainMessage = day.Weather is null
+            ? string.Empty
+            : $" Wastes day: {day.Weather.Rule.Name}; encounter: {day.Encounter!.Title}.";
         return MoveSucceeded($"{rationMessage} Roaming hazards advance to local day {localMap.RoamingHazardDay}.{terrainMessage} Day {PartyTravel.Day} begins with 18 miles available.");
     }
 

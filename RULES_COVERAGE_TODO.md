@@ -39,12 +39,17 @@ Codex rules against the extracted main text in
         multiplication signs, smart quotes, and merged headings
         (`TextStaysFreeOfOcrArtifacts`).
 
-- [ ] 2. Build the daily travel/day-resolution engine.
-  - [ ] Resolve a route/day using navigation, weather, encounters, rations,
-        forced march, and rest as one campaign operation.
-  - [ ] Persist daily outcomes and expose them through the UI travel log.
-  - [ ] Apply Wastes weather effects to party state instead of only reporting
-        pending saves or damage.
+- [~] 2. Build the daily travel/day-resolution engine.
+  - [~] `DayResolutionService` resolves navigation, Wastes weather, and the
+        weather-modified encounter as one operation, and `Campaign.TryRestParty`
+        ties it to rations, rest, and hazard advance. Still outstanding:
+        Travelers do not yet carry navigation assets (none are supplied), and
+        movement remains hex-by-hex rather than a single route/day call.
+  - [x] Persist daily outcomes: the day's log lines and pending decisions are
+        appended to the campaign travel log (persisted to the save).
+  - [x] Apply Wastes weather effects to party state: Wind Blast damage is now
+        applied to Travelers; Breath saves and buried Travelers are recorded as
+        explicit pending decisions instead of silent reports.
 
 - [ ] 3. Add persistent settlement generation and services.
   - [ ] Generate and save settlement population, scarcity, atmosphere, locations,
