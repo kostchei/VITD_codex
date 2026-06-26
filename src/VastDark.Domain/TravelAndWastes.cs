@@ -111,6 +111,18 @@ public sealed class Traveler
 
     public int RangedAttackModifier => GetAbilityModifier(Ability.Dexterity);
 
+    /// <summary>Attack ability for a weapon: DEX for ranged, the better of STR/DEX for finesse, otherwise STR.</summary>
+    public int AttackModifierFor(Weapon weapon)
+    {
+        ArgumentNullException.ThrowIfNull(weapon);
+        if (weapon.Ranged) return GetAbilityModifier(Ability.Dexterity);
+        if (weapon.Finesse) return Math.Max(GetAbilityModifier(Ability.Strength), GetAbilityModifier(Ability.Dexterity));
+        return GetAbilityModifier(Ability.Strength);
+    }
+
+    /// <summary>Shadowdark adds the same ability modifier to weapon damage as to the attack roll.</summary>
+    public int DamageModifierFor(Weapon weapon) => AttackModifierFor(weapon);
+
     public void SetHarrowing(IEnumerable<string> memories) => Harrowing = new Harrowing(memories);
     public void JoinFaction(WastesFaction faction) => _wastesFactions.Add(faction);
     public void JoinFaction(SettlementFaction faction) => _settlementFactions.Add(faction);

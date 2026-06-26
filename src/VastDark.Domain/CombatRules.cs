@@ -13,7 +13,9 @@ public sealed record Weapon(
     int DamageBonus = 0,
     int CriticalMultiplier = 2,
     bool AddsAbilityModifier = true,
-    bool BreaksOnFumble = false);
+    bool BreaksOnFumble = false,
+    bool Finesse = false,
+    bool Ranged = false);
 
 /// <summary>
 /// Shadowdark attack resolution: an attack roll (1d20 + attack modifier) against the target's AC,

@@ -11,6 +11,16 @@ public enum CheckDifficulty
 
 public enum RollMode { Normal, Advantage, Disadvantage }
 
+public static class RollModeRules
+{
+    /// <summary>
+    /// Shadowdark: advantage and disadvantage do not stack; if both apply (e.g. surprise plus cover)
+    /// they cancel and you roll a single d20.
+    /// </summary>
+    public static RollMode Combine(bool advantage, bool disadvantage) =>
+        advantage == disadvantage ? RollMode.Normal : advantage ? RollMode.Advantage : RollMode.Disadvantage;
+}
+
 public sealed record CheckResult(int NaturalRoll, int Total, int DifficultyClass, bool Success, bool CriticalSuccess, bool CriticalFailure);
 
 /// <summary>
@@ -36,6 +46,18 @@ public static class CheckResolver
 
     public static CheckResult Resolve(int abilityModifier, CheckDifficulty difficulty, IRandomSource random, RollMode mode = RollMode.Normal) =>
         Resolve(abilityModifier, (int)difficulty, random, mode);
+
+    /// <summary>A contested check: each side rolls 1d20 + modifier; the higher wins and ties are rerolled.</summary>
+    public static bool Contested(int challengerModifier, int defenderModifier, IRandomSource random)
+    {
+        ArgumentNullException.ThrowIfNull(random);
+        while (true)
+        {
+            var challenger = random.Next(1, 21) + challengerModifier;
+            var defender = random.Next(1, 21) + defenderModifier;
+            if (challenger != defender) return challenger > defender;
+        }
+    }
 
     private static int RollD20(RollMode mode, IRandomSource random) => mode switch
     {

@@ -7,7 +7,7 @@ namespace VastDark.Domain;
 /// </summary>
 public static class CutthroatRules
 {
-    public static Weapon ViciousDagger { get; } = new("Vicious Dagger", "1d4", CriticalMultiplier: 3);
+    public static Weapon ViciousDagger { get; } = new("Vicious Dagger", "1d4", CriticalMultiplier: 3, Finesse: true);
     public static Weapon Rock { get; } = new("Rock", "1d6", AddsAbilityModifier: false);
     public static Weapon MakeshiftSpear { get; } = new("Makeshift Spear", "1d6", DamageBonus: -1, BreaksOnFumble: true);
 
