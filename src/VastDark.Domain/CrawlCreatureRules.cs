@@ -2,6 +2,7 @@ namespace VastDark.Domain;
 
 public enum CrawlCreature { Cyclops, Medusa, Harpy, Griffon, Siren, Centaur, Hydra, Shade, Ogre, Wyrm }
 public sealed record CrawlCreatureRule(CrawlCreature Creature, int HitDice, int HitPoints, string Move, string Defense, string Attack, string Special);
+public sealed record OgreSpawnStat(int HitDice, int HitPoints, string Attack);
 
 public static class CrawlCreatureRules
 {
@@ -19,6 +20,11 @@ public static class CrawlCreatureRules
     public static (int Exhaustion, int ParalysisHours) HydraVenom(bool poisonSaveSucceeded, IRandomSource random) => poisonSaveSucceeded ? (1,0) : (random.Next(1,4),random.Next(1,4));
     public static (bool Blind, int Days) ShadeEyeBite(IRandomSource random) => random.Next(1,7) == 1 ? (true,random.Next(1,4)) : (false,0);
     public static int OgreSpawnCount(int hitPoints, IRandomSource random) => hitPoints == 10 ? random.Next(1,7) : 0;
+    public static OgreSpawnStat OgreSpawnStatBlock { get; } = new(1, 5, "1d6");
+    public static IReadOnlyList<Monster> CreateOgreSpawn(int count) =>
+        count < 0
+            ? throw new ArgumentOutOfRangeException(nameof(count))
+            : Enumerable.Range(0, count).Select(_ => new Monster("Ogre Spawn", OgreSpawnStatBlock.HitPoints, MonsterArmor.ArmorClass("None"))).ToList();
     public static (int Damage, bool Deafened, int DeafenedHours) WyrmHowl(bool breathSaveSucceeded, IRandomSource random)
     {
         var damage = Enumerable.Range(0,3).Sum(_ => random.Next(1,7));

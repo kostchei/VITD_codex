@@ -8,6 +8,8 @@ internal static class MonsterRulesTests
         HitPointsClampAndReportDeath();
         ArmorDescriptorsMapToShadowdarkAc();
         MonstersBuildFromSourceStatBlocks();
+        DemagogueStatBlockMatchesPage13();
+        OgreSpawnStatBlockMatchesPage41();
     }
 
     private static void HitPointsClampAndReportDeath()
@@ -41,6 +43,28 @@ internal static class MonsterRulesTests
 
         var delvers = Monster.FromStatBlock(RuinEncounterRules.GetStatBlock("Delvers"));
         Assert(delvers is { ArmorClass: 13 } && delvers.HitPoints.Maximum == 20, "Ruin Delvers must build as 20 HP / Scale AC 13.");
+    }
+
+    private static void DemagogueStatBlockMatchesPage13()
+    {
+        Assert(DemagogueRules.StatBlock is { HitDice: 5, HitPoints: 30, Defense: "Plate", Attack: "Lodestone Blade", DamageDice: "1d10" }, "The Demagogue stat block must match page 13.");
+        Assert(DemagogueRules.VoiceOfTheDarkSave == "Charm", "Voice of the Dark must force a Charm save.");
+        Assert(DemagogueRules.KnownSpellCount(new ScriptedRandom(2)) == 2, "The Demagogue must know 1d3 random spells.");
+        Assert(DemagogueRules.RollArtifact(new ScriptedRandom(10)).Name == "Commune", "The Demagogue's artifact is a Great and Terrible treasure.");
+
+        var demagogue = DemagogueRules.CreateMonster();
+        Assert(demagogue is { Name: "Demagogue", ArmorClass: 15 } && demagogue.HitPoints.Maximum == 30, "The Demagogue must build as 30 HP / Plate AC 15.");
+        // It can be cut down with the standard attack resolver; slaying it ends the Warband.
+        var strike = AttackResolver.Strike(demagogue, attackModifier: 5, "10d6", new ScriptedRandom(15, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6));
+        Assert(strike.Hit && demagogue.IsDead, "A 10d6 strike (60) must drop the 30-HP Demagogue.");
+    }
+
+    private static void OgreSpawnStatBlockMatchesPage41()
+    {
+        Assert(CrawlCreatureRules.OgreSpawnStatBlock is { HitDice: 1, HitPoints: 5, Attack: "1d6" }, "Ogre Spawn must be 1 HD / 5 HP / 1d6.");
+        var spawn = CrawlCreatureRules.CreateOgreSpawn(3);
+        Assert(spawn.Count == 3, "An Ogre at 10 HP splits into the rolled number of spawn.");
+        Assert(spawn[0] is { Name: "Ogre Spawn", ArmorClass: 10 } && spawn[0].HitPoints.Maximum == 5, "Each Ogre Spawn must build as 5 HP / unarmored AC 10.");
     }
 
     private static bool ThrowsArgumentOutOfRange(Action action)
