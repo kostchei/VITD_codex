@@ -122,10 +122,9 @@ internal static class EncounterResolverTests
             "A Warband must start hostile combat with the rolled 5d6 count.");
 
         // Die 2 = Maelstrom in the open -> displacement (d6 direction) plus 3d20 applied damage.
-        // A high-HP Traveler keeps the focus on damage application (no death-timer roll at 0 HP).
         var maelstrom = EncounterResolver.ResolveRoamingHazard(
             2,
-            new TravelParty([new Traveler("Vael", health: 100)]),
+            SoloParty(),
             new RoamingHazardContext(Terrain.Wastes),
             new ScriptedRandom(3, 10, 10, 10));
         Assert(

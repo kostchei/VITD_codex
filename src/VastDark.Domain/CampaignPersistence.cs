@@ -53,10 +53,7 @@ public sealed record TravelerState(
     List<ExhaustionSource>? ExhaustionSources = null,
     int Level = 1,
     Vitality? Vitality = null,
-    TravelerRulesState? Rules = null,
-    int? MaximumHealth = null,
-    bool IsDying = false,
-    int DeathTimer = 0);
+    TravelerRulesState? Rules = null);
 
 public sealed record PartyState(List<TravelerState> Members);
 

@@ -24,7 +24,6 @@ public sealed class Traveler
     private readonly List<ExhaustionSource> _exhaustionSources = [];
     private readonly HashSet<WastesFaction> _wastesFactions = [];
     private readonly HashSet<SettlementFaction> _settlementFactions = [];
-    private HitPoints _hitPoints;
 
     public Traveler(string name, int health = 10, int rations = 0, AbilityScores? abilityScores = null, int level = 1, Vitality? vitality = null, TravelerRulesState? rules = null)
     {
@@ -35,7 +34,7 @@ public sealed class Traveler
         }
 
         Name = name;
-        _hitPoints = new HitPoints(health, health);
+        Health = health;
         Rations = rations;
         AbilityScores = abilityScores ?? AbilityScores.Average;
         Level = level;
@@ -58,11 +57,6 @@ public sealed class Traveler
             state.Vitality,
             state.Rules)
     {
-        if (state.MaximumHealth is { } maximumHealth)
-        {
-            _hitPoints = new HitPoints(maximumHealth, state.Health, state.IsDying, state.DeathTimer);
-        }
-
         if (state.ExhaustionSources is { Count: > 0 })
         {
             foreach (var source in state.ExhaustionSources.Take(state.Exhaustion))
@@ -89,10 +83,7 @@ public sealed class Traveler
     }
 
     public string Name { get; }
-    public int Health => _hitPoints.Current;
-    public int MaximumHealth => _hitPoints.Maximum;
-    public bool IsDying => _hitPoints.IsDying;
-    public int DeathTimer => _hitPoints.DeathTimer;
+    public int Health { get; private set; }
     public int Rations { get; private set; }
     public int Exhaustion { get; private set; }
     public int Level { get; }
@@ -188,20 +179,14 @@ public sealed class Traveler
             throw new ArgumentOutOfRangeException(nameof(amount));
         }
 
-        _hitPoints = HitPointRules.ApplyDamage(_hitPoints, amount);
+        Health = Math.Max(0, Health - amount);
     }
 
     public DamageResolution? TakeDamage(int amount, IRandomSource random)
     {
-        ArgumentNullException.ThrowIfNull(random);
         if (Vitality is null)
         {
             DealDamage(amount);
-            if (_hitPoints.IsDown && !_hitPoints.IsDying)
-            {
-                _hitPoints = HitPointRules.EnterDying(_hitPoints, GetAbilityModifier(Ability.Constitution), random);
-            }
-
             return null;
         }
 
@@ -211,26 +196,9 @@ public sealed class Traveler
         return resolution;
     }
 
-    /// <summary>Advances one dying turn for a Traveler on the Shadowdark HP track.</summary>
-    public DyingOutcome TickDying(IRandomSource random)
-    {
-        var (hitPoints, outcome) = HitPointRules.TickDying(_hitPoints, random);
-        _hitPoints = hitPoints;
-        return outcome;
-    }
-
-    /// <summary>A close ally attempts a DC 15 Intelligence check to stabilize this dying Traveler.</summary>
-    public bool Stabilize(int healerIntelligenceModifier, IRandomSource random)
-    {
-        var (hitPoints, stabilized) = HitPointRules.Stabilize(_hitPoints, healerIntelligenceModifier, random);
-        _hitPoints = hitPoints;
-        return stabilized;
-    }
-
     public void RecoverGritAfterRest(bool fullDayOfRest, IRandomSource random)
     {
         if (Vitality is not null) Vitality = VitalityRules.RecoverGritAfterRest(Vitality, fullDayOfRest, random);
-        else if (fullDayOfRest) _hitPoints = HitPointRules.Rest(_hitPoints);
     }
 
     public void RecoverFleshAtSettlement()
@@ -274,10 +242,7 @@ public sealed class Traveler
         _exhaustionSources.ToList(),
         Level,
         Vitality,
-        CreateRulesState(),
-        _hitPoints.Maximum,
-        _hitPoints.IsDying,
-        _hitPoints.DeathTimer);
+        CreateRulesState());
 
     private TravelerRulesState CreateRulesState()
     {

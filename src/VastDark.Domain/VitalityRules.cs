@@ -19,11 +19,15 @@ public static class VitalityRules
             StartingFlesh(level, scores.HighestModifier));
     }
 
-    public static int StartingGrit(int level, int constitutionBonus, IEnumerable<int> d8Rolls)
+    /// <summary>
+    /// Grit is the Traveler's Shadowdark hit-point pool: a d8 hit die plus the Constitution modifier
+    /// per level, minimum 1 per level. Damage spends Grit before reaching Flesh.
+    /// </summary>
+    public static int StartingGrit(int level, int constitutionModifier, IEnumerable<int> d8Rolls)
     {
         var rolls = d8Rolls?.ToArray() ?? throw new ArgumentNullException(nameof(d8Rolls));
         if (level < 1 || rolls.Length != level || rolls.Any(roll => roll is < 1 or > 8)) throw new ArgumentOutOfRangeException(nameof(d8Rolls));
-        return rolls.Sum() + constitutionBonus;
+        return rolls.Sum(roll => Math.Max(1, roll + constitutionModifier));
     }
 
     public static int StartingFlesh(int level, int highestAbilityBonus) => level < 1 ? throw new ArgumentOutOfRangeException(nameof(level)) : level + highestAbilityBonus;
