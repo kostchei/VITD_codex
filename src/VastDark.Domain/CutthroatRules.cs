@@ -28,8 +28,14 @@ public static class WarbandRules
     public static Warband Create(IRandomSource random)
     {
         ArgumentNullException.ThrowIfNull(random);
-        var count = Enumerable.Range(0, 5).Sum(_ => random.Next(1, 7));
-        var cutthroats = Enumerable.Range(0, count).Select(_ => CutthroatRules.CreateMonster()).ToList();
+        return Compose(Enumerable.Range(0, 5).Sum(_ => random.Next(1, 7)));
+    }
+
+    /// <summary>Builds a Warband from an already-rolled Cutthroat count (e.g. the hazard's 5d6).</summary>
+    public static Warband Compose(int cutthroatCount)
+    {
+        if (cutthroatCount < 0) throw new ArgumentOutOfRangeException(nameof(cutthroatCount));
+        var cutthroats = Enumerable.Range(0, cutthroatCount).Select(_ => CutthroatRules.CreateMonster()).ToList();
         return new Warband(DemagogueRules.CreateMonster(), cutthroats);
     }
 }

@@ -111,15 +111,16 @@ internal static class EncounterResolverTests
             singingSand.PendingDecisions.Single() is SavingThrowDecision { SaveType: "Breath" },
             "Singing Sand on loose ground must demand a Breath save.");
 
-        // Die 1 = Warband -> 5d6 hostile Cutthroats.
+        // Die 1 = Warband -> a Demagogue leading the rolled 5d6 Cutthroats (all 6s = 30).
         var warband = EncounterResolver.ResolveRoamingHazard(
             1,
             SoloParty(),
             new RoamingHazardContext(Terrain.Wastes),
             new ScriptedRandom(6, 6, 6, 6, 6));
         Assert(
-            warband.PendingDecisions.Single() is CombatDecision { EnemyGroup: "Warband", CombatantCount: 30, Disposition: "Hostile" },
-            "A Warband must start hostile combat with the rolled 5d6 count.");
+            warband.PendingDecisions.Single() is WarbandDecision { Warband.Cutthroats.Count: 30 } decision &&
+            decision.Warband.Demagogue is { Name: "Demagogue", ArmorClass: 15 },
+            "A Warband must field its Demagogue and the rolled 5d6 Cutthroats.");
 
         // Die 2 = Maelstrom in the open -> displacement (d6 direction) plus 3d20 applied damage.
         var maelstrom = EncounterResolver.ResolveRoamingHazard(

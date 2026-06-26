@@ -36,6 +36,12 @@ public sealed record RefereeChoiceDecision(string ChoicePrompt, IReadOnlyList<st
     public override string Prompt => Options.Count == 0 ? ChoicePrompt : $"{ChoicePrompt} [{string.Join(" / ", Options)}]";
 }
 
+public sealed record WarbandDecision(Warband Warband) : PendingDecision
+{
+    public override string Prompt =>
+        $"Warband: a Demagogue leads {Warband.Cutthroats.Count} Cutthroats. Slaying the Demagogue destroys the hazard.";
+}
+
 public sealed record EncounterResolution(
     EncounterSource Source,
     string Title,
@@ -128,7 +134,11 @@ public static class EncounterResolver
 
         if (hazard.CombatantCount is { } combatants)
         {
-            decisions.Add(new CombatDecision(hazard.Rule.Name, combatants, null, "Hostile"));
+            // The Warband fields its actual roster (a Demagogue + the rolled 5d6 Cutthroats); other
+            // combat hazards (e.g. the Crawlherd) remain a generic count for now.
+            decisions.Add(string.Equals(hazard.Rule.Name, "Warband", StringComparison.Ordinal)
+                ? new WarbandDecision(WarbandRules.Compose(combatants))
+                : new CombatDecision(hazard.Rule.Name, combatants, null, "Hostile"));
         }
 
         foreach (var displacement in hazard.Displacements)
