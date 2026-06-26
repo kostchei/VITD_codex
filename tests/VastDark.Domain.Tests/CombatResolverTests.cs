@@ -10,6 +10,7 @@ internal static class CombatResolverTests
         CriticalHitsDoubleTheDamageDice();
         StrikingAMonsterReducesItsHp();
         StrikingATravelerSpendsGrit();
+        MoraleBreaksAtHalfStrength();
     }
 
     private static void DiceExpressionsParseAndRoll()
@@ -52,6 +53,18 @@ internal static class CombatResolverTests
         var traveler = new Traveler("Vael", vitality: new Vitality(5, 4));
         var result = AttackResolver.Strike(traveler, 0, "1d4", new ScriptedRandom(10, 3));
         Assert(result.Hit && traveler.Vitality!.Grit == 2, "A hit on a Traveler must spend Grit before Flesh.");
+    }
+
+    private static void MoraleBreaksAtHalfStrength()
+    {
+        Assert(MoraleRules.GroupMustCheck(6, 3) && !MoraleRules.GroupMustCheck(6, 4), "A group must check morale only once reduced to half size or fewer.");
+
+        var bloodied = Monster.FromCrawl(CrawlCreature.Cyclops); // 10 HP
+        bloodied.Damage(5);
+        Assert(MoraleRules.SoloMustCheck(bloodied), "A solo enemy at half HP must check morale.");
+
+        Assert(MoraleRules.Check(3, new ScriptedRandom(12)) is { Holds: true }, "WIS +3 with a 12 (=15) holds against DC 15.");
+        Assert(MoraleRules.Check(3, new ScriptedRandom(5)) is { Flees: true }, "Failing the DC 15 morale check means the enemy flees.");
     }
 
     private static bool ThrowsFormat(Action action)

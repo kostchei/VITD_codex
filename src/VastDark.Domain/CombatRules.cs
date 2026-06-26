@@ -38,3 +38,34 @@ public static class AttackResolver
         return result;
     }
 }
+
+public sealed record MoraleResult(bool Holds, bool Flees, CheckResult Check);
+
+/// <summary>
+/// Shadowdark morale (p. 51): a group reduced to half its size, or a solo enemy reduced to half HP,
+/// makes a DC 15 Wisdom check (one roll per group, using the leader's WIS). Failure means it flees.
+/// </summary>
+public static class MoraleRules
+{
+    public const int FleeDifficultyClass = 15;
+
+    public static bool GroupMustCheck(int originalSize, int remaining)
+    {
+        if (originalSize < 1) throw new ArgumentOutOfRangeException(nameof(originalSize));
+        if (remaining < 0 || remaining > originalSize) throw new ArgumentOutOfRangeException(nameof(remaining));
+        return remaining * 2 <= originalSize;
+    }
+
+    public static bool SoloMustCheck(Monster monster)
+    {
+        ArgumentNullException.ThrowIfNull(monster);
+        return monster.HitPoints.Current * 2 <= monster.HitPoints.Maximum;
+    }
+
+    public static MoraleResult Check(int leaderWisdomModifier, IRandomSource random)
+    {
+        ArgumentNullException.ThrowIfNull(random);
+        var check = CheckResolver.Resolve(leaderWisdomModifier, FleeDifficultyClass, random);
+        return new MoraleResult(check.Success, !check.Success, check);
+    }
+}
