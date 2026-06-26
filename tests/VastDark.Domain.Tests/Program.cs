@@ -9,6 +9,7 @@
     ("Check and save resolver", CheckResolverTests.Run),
     ("Vitality (Grit/Flesh)", VitalityRulesTests.Run),
     ("Monster combat", MonsterRulesTests.Run),
+    ("Attack resolver", CombatResolverTests.Run),
     ("Travel and campaign", TravelCampaignTests.Run),
     ("Persistence", PersistenceTests.Run),
 };

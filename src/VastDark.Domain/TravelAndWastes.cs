@@ -104,6 +104,13 @@ public sealed class Traveler
 
     public int GetAbilityModifier(Ability ability) => AbilityScores.Modifier(ability);
 
+    /// <summary>Unarmored Shadowdark baseline AC (10 + DEX). Worn-armor bonuses are not yet modeled.</summary>
+    public int ArmorClass => 10 + GetAbilityModifier(Ability.Dexterity);
+
+    public int MeleeAttackModifier => GetAbilityModifier(Ability.Strength);
+
+    public int RangedAttackModifier => GetAbilityModifier(Ability.Dexterity);
+
     public void SetHarrowing(IEnumerable<string> memories) => Harrowing = new Harrowing(memories);
     public void JoinFaction(WastesFaction faction) => _wastesFactions.Add(faction);
     public void JoinFaction(SettlementFaction faction) => _settlementFactions.Add(faction);
