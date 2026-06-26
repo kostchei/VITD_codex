@@ -19,11 +19,12 @@ public readonly record struct DiceExpression(int Count, int Sides)
         return new DiceExpression(count, sides);
     }
 
-    /// <summary>Rolls the expression. On a critical hit the number of dice is doubled (Shadowdark crit).</summary>
-    public int Roll(IRandomSource random, bool doubleDice = false)
+    /// <summary>Rolls the expression. A critical hit multiplies the number of dice (×2 normally, more for some weapons).</summary>
+    public int Roll(IRandomSource random, int diceMultiplier = 1)
     {
         ArgumentNullException.ThrowIfNull(random);
-        var rolls = doubleDice ? Count * 2 : Count;
+        if (diceMultiplier < 1) throw new ArgumentOutOfRangeException(nameof(diceMultiplier));
+        var rolls = Count * diceMultiplier;
         var total = 0;
         for (var index = 0; index < rolls; index++)
         {

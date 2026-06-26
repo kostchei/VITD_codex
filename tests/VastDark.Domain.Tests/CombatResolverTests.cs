@@ -11,6 +11,8 @@ internal static class CombatResolverTests
         StrikingAMonsterReducesItsHp();
         StrikingATravelerSpendsGrit();
         MoraleBreaksAtHalfStrength();
+        CutthroatWeaponsApplyTheirSpecialRules();
+        WarbandFieldsADemagogueAndCutthroats();
     }
 
     private static void DiceExpressionsParseAndRoll()
@@ -18,7 +20,7 @@ internal static class CombatResolverTests
         var dice = DiceExpression.Parse("2d6");
         Assert(dice is { Count: 2, Sides: 6 }, "'2d6' must parse to 2 six-sided dice.");
         Assert(dice.Roll(new ScriptedRandom(3, 4)) == 7, "2d6 of 3 and 4 must total 7.");
-        Assert(dice.Roll(new ScriptedRandom(1, 1, 1, 1), doubleDice: true) == 4, "A critical doubles the dice count (2d6 -> 4d6).");
+        Assert(dice.Roll(new ScriptedRandom(1, 1, 1, 1), diceMultiplier: 2) == 4, "A critical doubles the dice count (2d6 -> 4d6).");
         Assert(ThrowsFormat(() => DiceExpression.Parse("sword")), "A non-dice expression must throw rather than default.");
     }
 
@@ -65,6 +67,34 @@ internal static class CombatResolverTests
 
         Assert(MoraleRules.Check(3, new ScriptedRandom(12)) is { Holds: true }, "WIS +3 with a 12 (=15) holds against DC 15.");
         Assert(MoraleRules.Check(3, new ScriptedRandom(5)) is { Flees: true }, "Failing the DC 15 morale check means the enemy flees.");
+    }
+
+    private static void CutthroatWeaponsApplyTheirSpecialRules()
+    {
+        // Vicious dagger: 1d4 + ability bonus, and a natural-20 crit multiplies the dice x3.
+        var dagger = AttackResolver.Resolve(0, 10, CutthroatRules.ViciousDagger, abilityDamageModifier: 2, new ScriptedRandom(12, 3));
+        Assert(dagger.Damage == 5, "A dagger hit must add the wielder's ability bonus (1d4=3 +2).");
+        var daggerCrit = AttackResolver.Resolve(0, 10, CutthroatRules.ViciousDagger, abilityDamageModifier: 2, new ScriptedRandom(20, 3, 3, 3));
+        Assert(daggerCrit is { Critical: true, Damage: 11 }, "A vicious dagger crit rolls 3 dice (3+3+3) plus the bonus.");
+
+        // Rock: non-proficient, so the ability bonus is ignored.
+        var rock = AttackResolver.Resolve(0, 10, CutthroatRules.Rock, abilityDamageModifier: 3, new ScriptedRandom(12, 4));
+        Assert(rock.Damage == 4, "A non-proficient rock adds no ability bonus (1d6=4 only).");
+
+        // Makeshift spear: 1d6 - 1, and it shatters on a natural-1 fumble.
+        var spear = AttackResolver.Resolve(0, 10, CutthroatRules.MakeshiftSpear, abilityDamageModifier: 0, new ScriptedRandom(12, 4));
+        Assert(spear.Damage == 3, "A makeshift spear deals spear damage minus one (1d6=4 -1).");
+        var fumble = AttackResolver.Resolve(5, 10, CutthroatRules.MakeshiftSpear, abilityDamageModifier: 0, new ScriptedRandom(1));
+        Assert(fumble is { Hit: false, WeaponBroke: true }, "A natural 1 misses and shatters the makeshift spear.");
+    }
+
+    private static void WarbandFieldsADemagogueAndCutthroats()
+    {
+        // 5d6 Cutthroats (all 6s = 30) led by one Demagogue.
+        var warband = WarbandRules.Create(new ScriptedRandom(6, 6, 6, 6, 6));
+        Assert(warband.Cutthroats.Count == 30, "A Warband fields 5d6 Cutthroats.");
+        Assert(warband.Demagogue is { Name: "Demagogue", ArmorClass: 15 } && warband.Demagogue.HitPoints.Maximum == 30, "A Warband is led by the Demagogue boss.");
+        Assert(warband.Cutthroats[0] is { Name: "Cutthroat", ArmorClass: 13 } && warband.Cutthroats[0].HitPoints.Maximum == 18, "Cutthroats use the 18 HP / Scale AC 13 stat block.");
     }
 
     private static bool ThrowsFormat(Action action)
