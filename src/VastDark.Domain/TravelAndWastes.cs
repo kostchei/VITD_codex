@@ -107,6 +107,9 @@ public sealed class Traveler
     /// <summary>Unarmored Shadowdark baseline AC (10 + DEX). Worn-armor bonuses are not yet modeled.</summary>
     public int ArmorClass => 10 + GetAbilityModifier(Ability.Dexterity);
 
+    /// <summary>A Traveler is out of the fight once Flesh is gone (or HP for the plain-HP path).</summary>
+    public bool IsDefeated => Vitality is { } vitality ? vitality.Flesh <= 0 : Health <= 0;
+
     public int MeleeAttackModifier => GetAbilityModifier(Ability.Strength);
 
     public int RangedAttackModifier => GetAbilityModifier(Ability.Dexterity);

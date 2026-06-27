@@ -11,6 +11,7 @@
     ("Monster combat", MonsterRulesTests.Run),
     ("Attack resolver", CombatResolverTests.Run),
     ("Combat flow", CombatFlowTests.Run),
+    ("Combat driver", CombatDriverTests.Run),
     ("Travel and campaign", TravelCampaignTests.Run),
     ("Persistence", PersistenceTests.Run),
 };
