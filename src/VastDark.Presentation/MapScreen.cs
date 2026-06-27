@@ -36,6 +36,7 @@ public partial class MapScreen : Control
     private readonly Button _exitPillarButton = new() { Text = "Exit Pillar delve" };
     private readonly AcceptDialog _resolutionDialog = new() { Title = "Resolution" };
     private readonly EncounterScreen _encounterScreen = new();
+    private readonly CombatScreen _combatScreen = new();
     private readonly MenuButton _campaignMenu = new() { Text = "Campaign" };
     private readonly ConfirmationDialog _newCampaignConfirmation = new()
     {
@@ -192,6 +193,7 @@ public partial class MapScreen : Control
         AddChild(_newCampaignConfirmation);
         AddChild(_resolutionDialog);
         AddChild(_encounterScreen);
+        AddChild(_combatScreen);
         RefreshUi();
     }
 
@@ -428,6 +430,16 @@ public partial class MapScreen : Control
 
     private void PresentInterruption(TravelInterruption interruption)
     {
+        // A combat-type hazard (the Warband) opens the interactive combat view instead of the text modal.
+        if (interruption is { Kind: TravelInterruptionKind.RoamingHazard, HazardDieRoll: { } hazardDieRoll }
+            && _navigation.Campaign.TryBeginHazardCombat(hazardDieRoll) is { } encounter)
+        {
+            _combatScreen.Begin(encounter);
+            CampaignFile.Save(_navigation.Campaign, _campaignPath);
+            RefreshUi();
+            return;
+        }
+
         var resolution = _navigation.Campaign.ResolveTravelInterruption(interruption);
         _encounterScreen.Present(resolution);
         CampaignFile.Save(_navigation.Campaign, _campaignPath);

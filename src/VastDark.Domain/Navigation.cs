@@ -415,6 +415,18 @@ public sealed class Campaign
         return resolution;
     }
 
+    /// <summary>Builds a playable combat for a combat-type roaming hazard (currently the Warband), or null otherwise.</summary>
+    public CombatEncounter? TryBeginHazardCombat(int hazardDieRoll)
+    {
+        if (!string.Equals(RoamingHazardRules.Get(hazardDieRoll).Name, "Warband", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var random = new SystemRandomSource(_random);
+        return CombatEncounter.ForWarband(Party.Members, WarbandRules.Create(random), random);
+    }
+
     public CampaignActionResult TryBuyRationsAtSettlement(int quantity = 1)
     {
         if (quantity < 1)
